@@ -160,7 +160,7 @@ async function main() {
 
 function buildNodeBootstrapLines(prefix, nodeId, lat, lon) {
   const label = nodeId.replace(/^NODE_/, '');
-  const status = `${prefix}: ${label}: STATUS: Mode:WiFi+BLE Scan:IDLE Hits:0 Unique:0 Temp:32.0C Up:00:05:00 GPS:${lat.toFixed(6)},${lon.toFixed(6)}`;
+  const status = `${prefix}: ${label}: STATUS: Mode:WiFi+BLE Scan:IDLE Hits:0 Temp:32.0C Up:00:05:00 GPS:${lat.toFixed(6)},${lon.toFixed(6)}`;
   const gps = `${prefix}: ${label}: GPS:LOCK Location ${lat.toFixed(6)},${lon.toFixed(6)} Satellites:12 HDOP:0.9`;
   return [status, gps];
 }
