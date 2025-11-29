@@ -1156,6 +1156,7 @@ The sniffer is a zero-dependency TypeScript script that mirrors frames to stdout
 | `pnpm --filter @command-center/backend prisma:seed`                    | Reseed config rows                                                                                                                                      |
 | `pnpm seed`                                                            | Shortcut to seed default admin (requires pnpm on host)                                                                                                  |
 | `pnpm update-db` (or `node scripts/db-update-helper.mjs`)              | Auto-detects DB state, baselines existing schemas, removes duplicate CREATE TABLE migrations, runs `prisma migrate deploy`, and surfaces drift guidance |
+| `pnpm db:reset`                                                        | **WARNING: DELETES ALL DATA.** Nuclear option that drops database, recreates it from schema.prisma (bypasses migrations), and seeds. Use when migrations are broken beyond repair. |
 | `pnpm --filter @command-center/frontend preview`                       | Preview SPA production build                                                                                                                            |
 | `pnpm exec node scripts/drone-simulator.cjs --token "<JWT>" [options]` | Push simulated mesh lines (node bootstrap + drone telemetry) into `/api/serial/simulate` for end-to-end testing.                                        |
 

@@ -19,7 +19,8 @@
     "format": "pnpm -r format",
     "seed": "pnpm --filter @command-center/backend prisma:seed",
     "tool:sniffer": "pnpm exec ts-node --transpile-only --project tools/tsconfig.sniffer.json tools/meshtastic-sniffer.ts",
-    "update-db": "node scripts/db-update-helper.mjs"
+    "update-db": "node scripts/db-update-helper.mjs",
+    "db:reset": "node scripts/db-reset.mjs"
   },
   "dependencies": {
     "serialport": "^12.0.0",
