@@ -14,11 +14,14 @@ import {
   MdBookmarkAdd,
   MdClose,
   MdRadar,
+  MdSettingsInputAntenna,
 } from 'react-icons/md';
 
+import { getAcarsMessages } from '../api/acars';
 import { getAdsbTracksViaProxy } from '../api/adsb';
 import { apiClient } from '../api/client';
 import type {
+  AcarsMessage,
   AlarmLevel,
   AppSettings,
   AuthUser,
@@ -35,6 +38,7 @@ import { DroneFloatingCard } from '../components/DroneFloatingCard';
 import { CommandCenterMap, type IndicatorSeverity } from '../components/map/CommandCenterMap';
 import { extractAlertColors, applyAlertOverrides } from '../constants/alert-colors';
 import type { AlertColorConfig } from '../constants/alert-colors';
+import { useAdsbStore } from '../stores/adsb-store';
 import { useAlertStore } from '../stores/alert-store';
 import { useAuthStore } from '../stores/auth-store';
 import { useDroneStore } from '../stores/drone-store';
@@ -120,6 +124,7 @@ export function MapPage() {
   const setDroneStatusStore = useDroneStore((state) => state.setStatus);
   const setPendingDroneStatus = useDroneStore((state) => state.setPendingStatus);
   const clearPendingDroneStatus = useDroneStore((state) => state.clearPendingStatus);
+  const adsbTrails = useAdsbStore((state) => state.trails);
 
   const sitesQuery = useQuery({
     queryKey: ['sites'],
@@ -197,6 +202,8 @@ export function MapPage() {
 
   const adsbAddonEnabled =
     useAuthStore((state) => state.user?.preferences?.notifications?.addons?.adsb ?? true) ?? true;
+  const acarsAddonEnabled =
+    useAuthStore((state) => state.user?.preferences?.notifications?.addons?.acars ?? true) ?? true;
 
   const {
     trailsEnabled,
@@ -206,6 +213,7 @@ export function MapPage() {
     coverageEnabled,
     adsbEnabled,
     adsbGeofenceEnabled,
+    acarsEnabled,
     mapStyle,
     toggleTrails,
     toggleRadius,
@@ -213,6 +221,7 @@ export function MapPage() {
     toggleTargets,
     toggleAdsb,
     toggleAdsbGeofence,
+    toggleAcars,
   } = useMapPreferences();
   const fitEnabled = useMapPreferences((state) => state.fitEnabled);
   const setMapStyle = useMapPreferences((state) => state.setMapStyle);
@@ -239,6 +248,44 @@ export function MapPage() {
           })
         : [],
     [adsbAddonEnabled, adsbEnabled, adsbTracksQuery.data],
+  );
+
+  const acarsMessagesQuery = useQuery({
+    queryKey: ['acars', 'messages'],
+    queryFn: getAcarsMessages,
+    enabled: isAuthenticated && acarsAddonEnabled && acarsEnabled,
+    refetchInterval: 5_000,
+  });
+
+  const acarsMessages = useMemo(
+    () =>
+      acarsAddonEnabled && acarsEnabled && acarsMessagesQuery.data
+        ? acarsMessagesQuery.data.filter((message) => {
+            return message.tail && message.tail.trim();
+          })
+        : [],
+    [acarsAddonEnabled, acarsEnabled, acarsMessagesQuery.data],
+  );
+
+  const acarsMessagesByIcao = useMemo(() => {
+    const map = new Map<string, AcarsMessage[]>();
+    acarsMessages.forEach((message) => {
+      if (message.correlatedIcao) {
+        const existing = map.get(message.correlatedIcao) ?? [];
+        existing.push(message);
+        map.set(message.correlatedIcao, existing);
+      }
+    });
+    return map;
+  }, [acarsMessages]);
+
+  const uncorrelatedAcarsMessages = useMemo(
+    () =>
+      acarsMessages.filter(
+        (message) =>
+          !message.correlatedIcao && hasValidPosition(message.lat ?? null, message.lon ?? null),
+      ),
+    [acarsMessages],
   );
 
   useEffect(() => {
@@ -747,6 +794,15 @@ export function MapPage() {
                 </button>
               </>
             ) : null}
+            {acarsAddonEnabled ? (
+              <button
+                type="button"
+                className={`control-chip ${acarsEnabled ? 'is-active' : ''}`}
+                onClick={toggleAcars}
+              >
+                <MdSettingsInputAntenna /> ACARS
+              </button>
+            ) : null}
           </div>
         </header>
         <div className="map-canvas">
@@ -763,6 +819,13 @@ export function MapPage() {
             showTrails={trailsEnabled}
             showTargets={targetsEnabled}
             adsbTracks={adsbAddonEnabled && adsbEnabled ? adsbTracks : []}
+            adsbTrails={adsbTrails}
+            acarsMessagesByIcao={
+              acarsAddonEnabled && acarsEnabled ? acarsMessagesByIcao : new Map()
+            }
+            uncorrelatedAcarsMessages={
+              acarsAddonEnabled && acarsEnabled ? uncorrelatedAcarsMessages : []
+            }
             followEnabled={followEnabled}
             showCoverage={coverageEnabled}
             mapStyle={mapStyle}

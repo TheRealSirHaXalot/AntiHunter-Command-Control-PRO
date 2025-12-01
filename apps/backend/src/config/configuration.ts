@@ -172,4 +172,10 @@ export default () => ({
     pollIntervalMs: parseNumberEnv(process.env.ADSB_POLL_INTERVAL_MS, 15000),
     geofencesEnabled: process.env.ADSB_GEOFENCES_ENABLED === 'true',
   },
+  acars: {
+    enabled: process.env.ACARS_ENABLED === 'true',
+    udpHost: process.env.ACARS_UDP_HOST ?? '127.0.0.1',
+    udpPort: parseNumberEnv(process.env.ACARS_UDP_PORT, 15550),
+    messageExpiryMs: parseNumberEnv(process.env.ACARS_MESSAGE_EXPIRY_MS, 3600000),
+  },
 });

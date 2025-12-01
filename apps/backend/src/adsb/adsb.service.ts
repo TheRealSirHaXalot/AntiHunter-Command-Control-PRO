@@ -23,6 +23,7 @@ type AircraftDbEntry = {
   manufacturer?: string | null;
   aircraftType?: string | null;
   categoryDescription?: string | null;
+  registration?: string | null;
 };
 
 interface Dump1090Aircraft {
@@ -212,6 +213,7 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
         typeCode: this.getColumn(cols, header, 'typecode'),
         aircraftType: this.getColumn(cols, header, 'icaoaircrafttype'),
         categoryDescription: this.getColumn(cols, header, 'categoryDescription'),
+        registration: this.getColumn(cols, header, 'registration'),
       });
     }
     this.aircraftDb = next;
@@ -522,6 +524,7 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
     track.typeCode = entry.typeCode ?? track.typeCode ?? null;
     track.aircraftType = entry.aircraftType ?? track.aircraftType ?? null;
     track.categoryDescription = entry.categoryDescription ?? track.categoryDescription ?? null;
+    track.reg = entry.registration ?? track.reg ?? null;
     if (!track.category && entry.categoryDescription) {
       track.category = entry.categoryDescription;
     }

@@ -11,9 +11,11 @@ import type {
   Target,
   ChatClearEvent,
   AdsbTrack,
+  AcarsMessage,
 } from '../api/types';
 import { useAlarm } from '../providers/alarm-provider';
 import { useSocket } from '../providers/socket-provider';
+import { useAdsbStore } from '../stores/adsb-store';
 import { useAlertStore } from '../stores/alert-store';
 import { useAuthStore } from '../stores/auth-store';
 import { useChatKeyStore } from '../stores/chat-key-store';
@@ -51,6 +53,8 @@ export function SocketBridge() {
   const removeDrone = useDroneStore((state) => state.remove);
   const setDroneStatus = useDroneStore((state) => state.setStatus);
   const addChatIncoming = useChatStore((state) => state.addIncoming);
+  const appendAdsbTrail = useAdsbStore((state) => state.appendTrailPoint);
+  const pruneAdsbTrails = useAdsbStore((state) => state.pruneInactiveTracks);
 
   useEffect(() => {
     if (!socket) {
@@ -162,6 +166,19 @@ export function SocketBridge() {
             (track.callsign && track.callsign.trim()) || (track.reg && track.reg.trim());
           return Boolean(hasId);
         });
+
+        // Update ADSB trails
+        const activeIds = new Set<string>();
+        filteredTracks.forEach((track) => {
+          activeIds.add(track.id);
+          appendAdsbTrail(track.id, {
+            lat: track.lat,
+            lon: track.lon,
+            ts: track.lastSeen,
+          });
+        });
+        pruneAdsbTrails(activeIds);
+
         const adsbMuted = useMapPreferences.getState().adsbMuted;
         if (!adsbMuted) {
           addEntry({
@@ -172,6 +189,31 @@ export function SocketBridge() {
           });
         }
         queryClient.setQueryData(['adsb', 'tracks'], filteredTracks);
+        return;
+      }
+      if (isAcarsMessagesEvent(payload)) {
+        const acarsMuted = useMapPreferences.getState().acarsMuted;
+        if (!acarsMuted && payload.messages.length > 0) {
+          payload.messages.forEach((msg) => {
+            const label = msg.flight || msg.tail;
+            const textPreview = msg.text
+              ? msg.text.length > 50
+                ? `${msg.text.substring(0, 47)}...`
+                : msg.text
+              : '';
+            const labelInfo = msg.label ? ` [${msg.label}]` : '';
+            const freqInfo = msg.frequency ? ` ${msg.frequency.toFixed(3)}MHz` : '';
+            const signalInfo = msg.signalLevel ? ` ${msg.signalLevel.toFixed(1)}dB` : '';
+
+            addEntry({
+              message: `ACARS ${label}${labelInfo}${freqInfo}${signalInfo}${textPreview ? `: ${textPreview}` : ''}`,
+              level: 'info',
+              source: 'acars',
+              timestamp: msg.timestamp,
+            });
+          });
+        }
+        queryClient.setQueryData(['acars', 'messages'], payload.messages);
         return;
       }
       if (isGeofenceAlertEvent(payload)) {
@@ -525,6 +567,8 @@ export function SocketBridge() {
     appendDroneTrail,
     removeDrone,
     setDroneStatus,
+    appendAdsbTrail,
+    pruneAdsbTrails,
   ]);
 
   useEffect(() => {
@@ -1131,6 +1175,16 @@ function isAdsbTracksEvent(
   }
   const base = payload as { type?: string; tracks?: unknown };
   return base.type === 'adsb.tracks' && Array.isArray(base.tracks);
+}
+
+function isAcarsMessagesEvent(
+  payload: unknown,
+): payload is { type: 'acars.messages'; messages: AcarsMessage[] } {
+  if (!payload || typeof payload !== 'object') {
+    return false;
+  }
+  const base = payload as { type?: string; messages?: unknown };
+  return base.type === 'acars.messages' && Array.isArray(base.messages);
 }
 
 function isGeofenceAlertEvent(payload: unknown): payload is {

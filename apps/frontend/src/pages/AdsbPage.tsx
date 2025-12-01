@@ -281,7 +281,16 @@ export function AdsbPage() {
                         <input
                           type="checkbox"
                           checked={adsbEnabled}
-                          onChange={(event) => setAdsbEnabled(event.target.checked)}
+                          onChange={(event) => {
+                            const newValue = event.target.checked;
+                            setAdsbEnabled(newValue);
+                            adsbConfigMutation.mutate({
+                              enabled: newValue,
+                              feedUrl: adsbFeedUrl,
+                              intervalMs: adsbIntervalMs,
+                              geofencesEnabled: adsbGeofencesEnabled,
+                            });
+                          }}
                         />
                         <span />
                       </label>

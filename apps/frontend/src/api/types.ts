@@ -308,6 +308,37 @@ export interface AdsbStatus {
   trackCount: number;
 }
 
+export interface AcarsMessage {
+  id: string;
+  tail: string;
+  flight?: string | null;
+  label?: string | null;
+  text?: string | null;
+  timestamp: string;
+  frequency?: number | null;
+  signalLevel?: number | null;
+  noiseLevel?: number | null;
+  mode?: string | null;
+  messageNumber?: string | null;
+  sublabel?: string | null;
+  channel?: number | null;
+  stationId?: string | null;
+  lastSeen: string;
+  lat?: number | null;
+  lon?: number | null;
+  correlatedIcao?: string | null;
+}
+
+export interface AcarsStatus {
+  enabled: boolean;
+  udpHost: string;
+  udpPort: number;
+  intervalMs?: number;
+  lastMessageAt?: string | null;
+  messageCount?: number;
+  lastError?: string | null;
+}
+
 export interface GeofenceVertex {
   lat: number;
   lon: number;

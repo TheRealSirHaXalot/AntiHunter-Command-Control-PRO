@@ -2,6 +2,7 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
 
+import { AcarsModule } from './acars/acars.module';
 import { AdsbModule } from './adsb/adsb.module';
 import { AlarmsModule } from './alarms/alarms.module';
 import { AlertRulesModule } from './alert-rules/alert-rules.module';
@@ -77,6 +78,7 @@ import { WsModule } from './ws/ws.module';
     NodesModule,
     DronesModule,
     InventoryModule,
+    AcarsModule,
     AdsbModule,
     CommandsModule,
     EventsModule,

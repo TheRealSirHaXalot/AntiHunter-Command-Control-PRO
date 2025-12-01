@@ -1,0 +1,5 @@
+{
+  "enabled": true,
+  "udpHost": "127.0.0.1",
+  "udpPort": 15550
+}

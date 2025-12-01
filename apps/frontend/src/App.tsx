@@ -16,6 +16,7 @@ import {
   applyAlertOverrides,
 } from './constants/alert-colors';
 import { resolveThemePalette, type ThemePalette, type ThemePresetId } from './constants/theme';
+import { AcarsPage } from './pages/AcarsPage';
 import { AddonPage } from './pages/AddonPage';
 import { AdsbPage } from './pages/AdsbPage';
 import { AlertsEventLogPage } from './pages/AlertsEventLogPage';
@@ -125,6 +126,7 @@ export default function App() {
               <Route path="/" element={<Navigate to="/map" replace />} />
               <Route path="/map" element={<MapPage />} />
               <Route path="/geofences" element={<GeofencePage />} />
+              <Route path="/acars" element={<AcarsPage />} />
               <Route path="/adsb" element={<AdsbPage />} />
               <Route path="/nodes" element={<NodesPage />} />
               <Route path="/targets" element={<TargetsPage />} />

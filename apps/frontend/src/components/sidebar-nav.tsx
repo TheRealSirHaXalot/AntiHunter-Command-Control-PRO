@@ -1,20 +1,21 @@
 import { useEffect, useMemo, useState, type ComponentType } from 'react';
 import {
-  MdMap,
-  MdSensors,
-  MdMyLocation,
-  MdWifiTethering,
-  MdTerminal,
   MdChat,
-  MdSettings,
   MdDownload,
   MdEventNote,
+  MdExtension,
+  MdHub,
+  MdMap,
+  MdMyLocation,
+  MdNotificationsActive,
   MdOutlineAreaChart,
   MdPerson,
-  MdHub,
-  MdExtension,
-  MdNotificationsActive,
   MdRadar,
+  MdSensors,
+  MdSettings,
+  MdSettingsInputAntenna,
+  MdTerminal,
+  MdWifiTethering,
 } from 'react-icons/md';
 import { NavLink } from 'react-router-dom';
 
@@ -33,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/inventory', label: 'Inventory', icon: MdWifiTethering },
   { to: '/alerts', label: 'Alerts', icon: MdNotificationsActive },
   { to: '/targets', label: 'Targets', icon: MdMyLocation },
+  { to: '/acars', label: 'ACARS', icon: MdSettingsInputAntenna },
   { to: '/adsb', label: 'ADS-B', icon: MdRadar },
   { to: '/geofences', label: 'Geofences', icon: MdOutlineAreaChart },
   { to: '/nodes', label: 'Nodes', icon: MdSensors },
@@ -54,6 +56,7 @@ export function SidebarNav() {
   const [schedulerEnabled, setSchedulerEnabled] = useState<boolean>(addons.scheduler ?? false);
   const [chatEnabled, setChatEnabled] = useState<boolean>(addons.chat ?? false);
   const [adsbEnabled, setAdsbEnabled] = useState<boolean>(addons.adsb ?? true);
+  const [acarsEnabled, setAcarsEnabled] = useState<boolean>(addons.acars ?? true);
 
   useEffect(() => {
     setStrategyEnabled(addons.strategy ?? false);
@@ -61,28 +64,20 @@ export function SidebarNav() {
     setSchedulerEnabled(addons.scheduler ?? false);
     setChatEnabled(addons.chat ?? false);
     setAdsbEnabled(addons.adsb ?? true);
-  }, [addons.alerts, addons.chat, addons.scheduler, addons.strategy, addons.adsb]);
+    setAcarsEnabled(addons.acars ?? true);
+  }, [addons.alerts, addons.chat, addons.scheduler, addons.strategy, addons.adsb, addons.acars]);
 
   const navItems = useMemo(() => {
     return NAV_ITEMS.filter((item) => {
-      if (item.to === '/strategy') {
-        return strategyEnabled;
-      }
-      if (item.to === '/alerts') {
-        return alertsEnabled;
-      }
-      if (item.to === '/scheduler') {
-        return schedulerEnabled;
-      }
-      if (item.to === '/chat') {
-        return chatEnabled;
-      }
-      if (item.to === '/adsb') {
-        return adsbEnabled;
-      }
+      if (item.to === '/strategy') return strategyEnabled;
+      if (item.to === '/alerts') return alertsEnabled;
+      if (item.to === '/scheduler') return schedulerEnabled;
+      if (item.to === '/chat') return chatEnabled;
+      if (item.to === '/adsb') return adsbEnabled;
+      if (item.to === '/acars') return acarsEnabled;
       return true;
     });
-  }, [strategyEnabled, alertsEnabled, schedulerEnabled, chatEnabled, adsbEnabled]);
+  }, [strategyEnabled, alertsEnabled, schedulerEnabled, chatEnabled, adsbEnabled, acarsEnabled]);
 
   return (
     <aside className="sidebar">
