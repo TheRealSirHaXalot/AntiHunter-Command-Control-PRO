@@ -17,17 +17,10 @@ import {
 } from 'react-leaflet';
 import 'leaflet.heat';
 
-import type {
-  AcarsMessage,
-  AdsbTrack,
-  Geofence,
-  GeofenceVertex,
-  DroneStatus,
-} from '../../api/types';
+import type { AdsbTrack, Geofence, GeofenceVertex, DroneStatus } from '../../api/types';
 import controllerMarkerIcon from '../../assets/drone-controller.svg';
 import droneMarkerIcon from '../../assets/drone-marker.svg';
 import type { AlertColorConfig } from '../../constants/alert-colors';
-import type { AdsbTrailPoint } from '../../stores/adsb-store';
 import type { DroneMarker, DroneTrailPoint } from '../../stores/drone-store';
 import {
   canonicalNodeId,
@@ -117,21 +110,140 @@ const ADSB_HELI_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 2
     d="M12 4.5v15M4.5 12H19.5M6.5 6.5l11 11M17.5 6.5l-11 11"
   />
 </svg>`;
-
-const ACARS_COMM_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+const ADSB_UAV_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
   <path
     fill="#ffffff"
-    d="M12 2c-1.1 0-2 .9-2 2v3c-2.8.4-5 2.8-5 5.7v3.6c0 .4.3.7.7.7h.6c.4 0 .7-.3.7-.7v-3.6c0-2.2 1.8-4 4-4s4 1.8 4 4v3.6c0 .4.3.7.7.7h.6c.4 0 .7-.3.7-.7v-3.6c0-2.9-2.2-5.3-5-5.7V4c0-.6.4-1 1-1s1 .4 1 1h2c0-1.1-.9-2-2-2zm-1 17h2v3h-2v-3z"
+    d="M12 10.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z"
   />
-  <circle cx="7" cy="8" r="1.5" fill="#ffffff"/>
-  <circle cx="17" cy="8" r="1.5" fill="#ffffff"/>
+  <circle cx="6" cy="6" r="2" fill="#ffffff"/>
+  <circle cx="18" cy="6" r="2" fill="#ffffff"/>
+  <circle cx="6" cy="18" r="2" fill="#ffffff"/>
+  <circle cx="18" cy="18" r="2" fill="#ffffff"/>
   <path
     stroke="#ffffff"
-    stroke-width="1"
-    stroke-linecap="round"
-    d="M5 5.5c-1-1-2-1.5-3-1.5M19 5.5c1-1 2-1.5 3-1.5"
+    stroke-width="1.2"
+    d="M10.5 11.5L7.5 7.5M13.5 11.5L16.5 7.5M10.5 12.5L7.5 16.5M13.5 12.5L16.5 16.5"
   />
 </svg>`;
+const ADSB_GLIDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <path
+    fill="#ffffff"
+    d="M12 8.5c-.28 0-.5.15-.5.35v1.4L3 11.5v.8l8.5-.5v2.5l-2 1.3v.8l2.5-.4 1-.15 1 .15 2.5.4v-.8l-2-1.3v-2.5l8.5.5v-.8l-8.5-1.25v-1.4c0-.2-.22-.35-.5-.35Z"
+  />
+</svg>`;
+const ADSB_BALLOON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <ellipse cx="12" cy="9" rx="6" ry="7" fill="#ffffff"/>
+  <path
+    fill="#ffffff"
+    d="M11 16h2v4h-2z"
+  />
+  <path
+    fill="#ffffff"
+    d="M9 20h6v1.5H9z"
+  />
+</svg>`;
+const ADSB_GROUND_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <rect x="7" y="8" width="10" height="8" rx="1" fill="#ffffff"/>
+  <rect x="6" y="14" width="3" height="4" rx="1" fill="#ffffff"/>
+  <rect x="15" y="14" width="3" height="4" rx="1" fill="#ffffff"/>
+  <path
+    fill="#ffffff"
+    d="M9 8V6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"
+  />
+</svg>`;
+const ADSB_HEAVY_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <path
+    fill="#ffffff"
+    d="M11.5 3c0-.28.22-.5.5-.5s.5.22.5.5v5.8l7 2.2v1.5l-7-1.2v2.8l2.2 1.5v1.3l-2.5-.4-.7-.1-.7.1-2.5.4v-1.3l2.2-1.5v-2.8l-7 1.2V11l7-2.2V3Z"
+  />
+  <path
+    fill="#ffffff"
+    d="M5 10.5h2v1H5zM17 10.5h2v1h-2z"
+  />
+</svg>`;
+const ADSB_FIGHTER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <path
+    fill="#ffffff"
+    d="M12 2.5c.28 0 .5.22.5.5v5.5l5.5 1.5v1l-5.5-.3v2l3 2v1l-3-.5-.5-.1-.5.1-3 .5v-1l3-2v-2l-5.5.3v-1l5.5-1.5V3c0-.28.22-.5.5-.5Z"
+  />
+  <path
+    fill="#ffffff"
+    d="M10 7l-2.5-1v2L10 7zM14 7l2.5-1v2L14 7z"
+  />
+  <path
+    fill="#ffffff"
+    d="M11.5 17v3.5h1V17z"
+  />
+</svg>`;
+
+type AdsbAircraftType =
+  | 'plane'
+  | 'helicopter'
+  | 'uav'
+  | 'glider'
+  | 'balloon'
+  | 'ground'
+  | 'heavy'
+  | 'fighter';
+
+interface AdsbTypeInfo {
+  type: AdsbAircraftType;
+  svg: string;
+  color: string;
+  label: string;
+  isMilitary: boolean;
+}
+
+const ADSB_TYPE_CONFIG: Record<AdsbAircraftType, Omit<AdsbTypeInfo, 'type'>> = {
+  plane: {
+    svg: ADSB_PLANE_SVG,
+    color: '#06b6d4', // cyan
+    label: 'Fixed wing',
+    isMilitary: false,
+  },
+  helicopter: {
+    svg: ADSB_HELI_SVG,
+    color: '#a855f7', // purple
+    label: 'Helicopter',
+    isMilitary: false,
+  },
+  uav: {
+    svg: ADSB_UAV_SVG,
+    color: '#ef4444', // red - threat indicator for anti-drone system
+    label: 'UAV/Drone',
+    isMilitary: false,
+  },
+  glider: {
+    svg: ADSB_GLIDER_SVG,
+    color: '#10b981', // green
+    label: 'Glider',
+    isMilitary: false,
+  },
+  balloon: {
+    svg: ADSB_BALLOON_SVG,
+    color: '#f59e0b', // amber
+    label: 'Balloon/Airship',
+    isMilitary: false,
+  },
+  ground: {
+    svg: ADSB_GROUND_SVG,
+    color: '#6b7280', // gray
+    label: 'Ground vehicle',
+    isMilitary: false,
+  },
+  heavy: {
+    svg: ADSB_HEAVY_SVG,
+    color: '#3b82f6', // blue
+    label: 'Heavy aircraft',
+    isMilitary: false,
+  },
+  fighter: {
+    svg: ADSB_FIGHTER_SVG,
+    color: '#dc2626', // dark red
+    label: 'High performance',
+    isMilitary: true,
+  },
+};
 
 function escapeHtml(input: string): string {
   return input.replace(/[&<>"']/g, (char) => {
@@ -207,62 +319,156 @@ function createTargetIcon(target: TargetMarker): DivIcon {
   });
 }
 
-function createAdsbIcon(track: AdsbTrack, hasAcarsMessages = false): DivIcon {
+function createAdsbIcon(track: AdsbTrack): DivIcon {
   const label = escapeHtml(track.callsign ?? track.reg ?? track.icao);
-  const isHelicopter = isHelicopterCategory(
+  const typeInfo = detectAdsbAircraftType(
     track.category,
     track.aircraftType,
     track.typeCode,
     track.categoryDescription,
   );
-  const color = isHelicopter ? '#a855f7' : '#06b6d4';
-  const markerClass = isHelicopter ? 'adsb-marker--heli' : 'adsb-marker--plane';
+  const config = ADSB_TYPE_CONFIG[typeInfo.type];
+  const markerClass = `adsb-marker--${typeInfo.type}`;
   const rotation = typeof track.heading === 'number' ? track.heading : null;
-  const svg = isHelicopter ? ADSB_HELI_SVG : ADSB_PLANE_SVG;
-  const acarsBadge = hasAcarsMessages
-    ? '<span class="adsb-marker__acars-badge" title="Has ACARS messages">⚡</span>'
-    : '';
   return divIcon({
-    html: `<div class="adsb-marker ${markerClass}" style="--adsb-color:${color};${
+    html: `<div class="adsb-marker ${markerClass}" style="--adsb-color:${config.color};${
       rotation != null ? `--adsb-rotation:${rotation}deg;` : ''
-    }"><span class="adsb-marker__icon" aria-hidden="true">${svg}</span><span class="adsb-marker__label">${label}${acarsBadge}</span></div>`,
+    }"><span class="adsb-marker__icon" aria-hidden="true">${config.svg}</span><span class="adsb-marker__label">${label}</span></div>`,
     className: 'adsb-marker-wrapper',
     iconSize: [40, 48],
     iconAnchor: [20, 24],
   });
 }
 
-function createAcarsIcon(message: AcarsMessage): DivIcon {
-  const label = escapeHtml(message.flight ?? message.tail);
-  const color = '#f59e0b';
-  return divIcon({
-    html: `<div class="acars-marker" style="--acars-color:${color};"><span class="acars-marker__icon" aria-hidden="true">${ACARS_COMM_SVG}</span><span class="acars-marker__label">${label}</span></div>`,
-    className: 'acars-marker-wrapper',
-    iconSize: [40, 48],
-    iconAnchor: [20, 24],
-  });
-}
-
-function isHelicopterCategory(
+function detectAdsbAircraftType(
   category?: string | null,
   aircraftType?: string | null,
   typeCode?: string | null,
   categoryDescription?: string | null,
-): boolean {
+): AdsbTypeInfo {
   const tokens = [category, aircraftType, typeCode, categoryDescription]
     .map((token) => token?.trim().toUpperCase())
     .filter((token): token is string => Boolean(token));
 
-  if (tokens.length === 0) return false;
+  // Check category codes first (most reliable)
+  const cat = category?.trim().toUpperCase();
+  if (cat) {
+    // Category A: Aircraft
+    if (cat === 'A7') {
+      return { type: 'helicopter', ...ADSB_TYPE_CONFIG.helicopter };
+    }
+    if (cat === 'A6') {
+      // High performance - likely military fighter
+      return { type: 'fighter', ...ADSB_TYPE_CONFIG.fighter };
+    }
+    if (cat === 'A5') {
+      // Heavy aircraft (>300,000 lbs)
+      return { type: 'heavy', ...ADSB_TYPE_CONFIG.heavy };
+    }
+    // A4, A3, A2, A1, A0 are regular planes
 
-  return tokens.some(
-    (token) =>
-      token.startsWith('B') ||
+    // Category B: Non-aircraft
+    if (cat === 'B6') {
+      // UAV/UAS
+      return { type: 'uav', ...ADSB_TYPE_CONFIG.uav };
+    }
+    if (cat === 'B1') {
+      return { type: 'glider', ...ADSB_TYPE_CONFIG.glider };
+    }
+    if (cat === 'B2') {
+      // Lighter-than-air
+      return { type: 'balloon', ...ADSB_TYPE_CONFIG.balloon };
+    }
+    if (cat === 'B3' || cat === 'B4') {
+      // Parachutist/Ultralight - treat as glider
+      return { type: 'glider', ...ADSB_TYPE_CONFIG.glider };
+    }
+
+    // Category C: Ground vehicles and obstacles
+    if (cat === 'C1' || cat === 'C2') {
+      return { type: 'ground', ...ADSB_TYPE_CONFIG.ground };
+    }
+    if (cat === 'C3' || cat === 'C4' || cat === 'C5') {
+      // Obstacles (including tethered balloons)
+      return { type: 'balloon', ...ADSB_TYPE_CONFIG.balloon };
+    }
+  }
+
+  // Fallback to text matching for incomplete data
+  for (const token of tokens) {
+    // Helicopter detection
+    if (
+      token === 'A7' ||
       token.startsWith('H') ||
       token.includes('HELI') ||
       token.includes('ROTOR') ||
-      token.includes('ROTARY'),
-  );
+      token.includes('ROTARY')
+    ) {
+      return { type: 'helicopter', ...ADSB_TYPE_CONFIG.helicopter };
+    }
+
+    // UAV/Drone detection
+    if (
+      token === 'B6' ||
+      token.includes('UAV') ||
+      token.includes('UAS') ||
+      token.includes('DRONE') ||
+      token.includes('UNMANNED')
+    ) {
+      return { type: 'uav', ...ADSB_TYPE_CONFIG.uav };
+    }
+
+    // Fighter/Military detection
+    if (
+      token === 'A6' ||
+      token.includes('FIGHTER') ||
+      token.includes('MILITARY') ||
+      token.includes('F-') || // F-16, F-22, etc.
+      token.includes('MIL')
+    ) {
+      return { type: 'fighter', ...ADSB_TYPE_CONFIG.fighter };
+    }
+
+    // Glider detection
+    if (
+      token === 'B1' ||
+      token.includes('GLIDER') ||
+      token.includes('SAILPLANE') ||
+      token.includes('ULTRA')
+    ) {
+      return { type: 'glider', ...ADSB_TYPE_CONFIG.glider };
+    }
+
+    // Balloon detection
+    if (
+      token === 'B2' ||
+      token === 'C3' ||
+      token.includes('BALLOON') ||
+      token.includes('AIRSHIP') ||
+      token.includes('BLIMP')
+    ) {
+      return { type: 'balloon', ...ADSB_TYPE_CONFIG.balloon };
+    }
+
+    // Ground vehicle detection
+    if (token === 'C1' || token === 'C2' || token.includes('GROUND') || token.includes('VEHICLE')) {
+      return { type: 'ground', ...ADSB_TYPE_CONFIG.ground };
+    }
+
+    // Heavy aircraft detection
+    if (
+      token === 'A5' ||
+      token.includes('HEAVY') ||
+      token.includes('A380') ||
+      token.includes('747') ||
+      token.includes('777')
+    ) {
+      return { type: 'heavy', ...ADSB_TYPE_CONFIG.heavy };
+    }
+  }
+
+  // Default to regular plane
+  return { type: 'plane', ...ADSB_TYPE_CONFIG.plane };
 }
 
 function createDroneIcon(drone: DroneMarker): DivIcon {
@@ -443,9 +649,6 @@ interface CommandCenterMapProps {
   followEnabled: boolean;
   showCoverage: boolean;
   adsbTracks?: { lat: number; lon: number; icao: string; callsign?: string | null; id: string }[];
-  adsbTrails?: Record<string, AdsbTrailPoint[]>;
-  acarsMessagesByIcao?: Map<string, AcarsMessage[]>;
-  uncorrelatedAcarsMessages?: AcarsMessage[];
   geofences: Geofence[];
   geofenceHighlights: Record<string, number>;
   mapStyle: string;
@@ -487,9 +690,6 @@ export function CommandCenterMap({
   onNodeCommand,
   trackingOverlays = [],
   adsbTracks = [],
-  adsbTrails = {},
-  acarsMessagesByIcao = new Map(),
-  uncorrelatedAcarsMessages = [],
 }: CommandCenterMapProps) {
   const mapRef = useRef<LeafletMap | null>(null);
   const baseLayerKeys = useMemo(() => BASE_LAYERS.map((layer) => layer.key), []);
@@ -542,11 +742,6 @@ export function CommandCenterMap({
         (track): track is AdsbTrack => Number.isFinite(track.lat) && Number.isFinite(track.lon),
       ),
     [adsbTracks],
-  );
-  const uncorrelatedAcarsWithPosition = useMemo(
-    () =>
-      uncorrelatedAcarsMessages.filter((msg) => hasValidPosition(msg.lat ?? null, msg.lon ?? null)),
-    [uncorrelatedAcarsMessages],
   );
 
   const center = useMemo<LatLngExpression>(() => {
@@ -807,112 +1002,37 @@ export function CommandCenterMap({
         })}
       {adsbWithPosition.map((track) => {
         const position: LatLngExpression = [track.lat, track.lon];
-        const trailPoints = adsbTrails[track.id] ?? [];
-        const trailPositions =
-          trailPoints.length > 1
-            ? (trailPoints.map((point) => [point.lat, point.lon]) as LatLngTuple[])
-            : null;
-        const isHelicopter = isHelicopterCategory(
+        const typeInfo = detectAdsbAircraftType(
           track.category,
           track.aircraftType,
           track.typeCode,
           track.categoryDescription,
         );
-        const trailColor = isHelicopter ? '#a855f7' : '#06b6d4';
-        const correlatedMessages = acarsMessagesByIcao.get(track.icao) ?? [];
-
         return (
-          <Fragment key={`adsb-${track.id}`}>
-            {trailPositions && showTrails ? (
-              <Polyline
-                positions={trailPositions}
-                pathOptions={{
-                  color: trailColor,
-                  weight: 2,
-                  opacity: 0.6,
-                }}
-              />
-            ) : null}
-            <Marker position={position} icon={createAdsbIcon(track, correlatedMessages.length > 0)}>
-              <Tooltip direction="top" offset={[0, -10]} opacity={0.95} className="tooltip--drone">
-                <div className="drone-tooltip">
-                  <div className="badge badge--inline">Source: ADS-B</div>
-                  <strong>{track.callsign ?? track.icao}</strong>
-                  <div className="muted">{track.icao}</div>
-                  <div>
-                    Location: {track.lat.toFixed(5)}, {track.lon.toFixed(5)}
-                  </div>
-                  <div>Type: {isHelicopter ? 'Helicopter' : 'Fixed wing'}</div>
-                  {track.dep || track.dest ? (
-                    <div>
-                      Route: {[track.dep, track.dest].filter(Boolean).join(' → ') || 'Unknown'}
-                    </div>
-                  ) : null}
-                  {track.reg ? <div>Registration: {track.reg}</div> : null}
-                  {track.country ? <div>Country: {track.country}</div> : null}
-                  {track.alt != null ? <div>Altitude: {track.alt.toFixed(0)} ft</div> : null}
-                  {track.speed != null ? <div>Speed: {track.speed.toFixed(0)} kt</div> : null}
-                  {track.heading != null ? (
-                    <div>Heading: {track.heading.toFixed(0)}&deg;</div>
-                  ) : null}
-                  <div>Last seen: {new Date(track.lastSeen).toLocaleTimeString()}</div>
-                  {correlatedMessages.length > 0 ? (
-                    <>
-                      <hr style={{ margin: '8px 0', borderColor: 'rgba(255,255,255,0.2)' }} />
-                      <div className="badge badge--inline" style={{ background: '#f59e0b' }}>
-                        ACARS Messages ({correlatedMessages.length})
-                      </div>
-                      {correlatedMessages.slice(0, 5).map((msg) => (
-                        <div key={msg.id} style={{ marginTop: '4px', fontSize: '0.9em' }}>
-                          <div>
-                            <strong>
-                              [{msg.label ?? 'N/A'}] {msg.text?.substring(0, 50)}
-                              {msg.text && msg.text.length > 50 ? '...' : ''}
-                            </strong>
-                          </div>
-                          <div className="muted" style={{ fontSize: '0.85em' }}>
-                            {new Date(msg.timestamp).toLocaleTimeString()}
-                            {msg.signalLevel ? ` • ${msg.signalLevel.toFixed(1)} dB` : ''}
-                          </div>
-                        </div>
-                      ))}
-                      {correlatedMessages.length > 5 ? (
-                        <div className="muted" style={{ marginTop: '4px', fontSize: '0.85em' }}>
-                          +{correlatedMessages.length - 5} more messages
-                        </div>
-                      ) : null}
-                    </>
-                  ) : null}
-                </div>
-              </Tooltip>
-            </Marker>
-          </Fragment>
-        );
-      })}
-      {uncorrelatedAcarsWithPosition.map((message) => {
-        const position: LatLngExpression = [message.lat!, message.lon!];
-        return (
-          <Marker key={`acars-${message.id}`} position={position} icon={createAcarsIcon(message)}>
+          <Marker key={`adsb-${track.id}`} position={position} icon={createAdsbIcon(track)}>
             <Tooltip direction="top" offset={[0, -10]} opacity={0.95} className="tooltip--drone">
               <div className="drone-tooltip">
-                <div className="badge badge--inline" style={{ background: '#f59e0b' }}>
-                  Source: ACARS (Uncorrelated)
-                </div>
-                <strong>{message.flight ?? message.tail}</strong>
-                <div className="muted">{message.tail}</div>
+                <div className="badge badge--inline">Source: ADS-B</div>
+                <strong>{track.callsign ?? track.icao}</strong>
+                <div className="muted">{track.icao}</div>
                 <div>
-                  Location: {message.lat!.toFixed(5)}, {message.lon!.toFixed(5)}
+                  Location: {track.lat.toFixed(5)}, {track.lon.toFixed(5)}
                 </div>
-                {message.label ? <div>Label: {message.label}</div> : null}
-                {message.text ? <div className="text-truncate">Message: {message.text}</div> : null}
-                {message.frequency ? (
-                  <div>Frequency: {message.frequency.toFixed(3)} MHz</div>
+                <div>Type: {typeInfo.label}</div>
+                {typeInfo.isMilitary ? (
+                  <div className="badge badge--warning">Classification: Military</div>
                 ) : null}
-                {message.signalLevel ? (
-                  <div>Signal: {message.signalLevel.toFixed(1)} dB</div>
+                {track.dep || track.dest ? (
+                  <div>
+                    Route: {[track.dep, track.dest].filter(Boolean).join(' → ') || 'Unknown'}
+                  </div>
                 ) : null}
-                {message.stationId ? <div>Station: {message.stationId}</div> : null}
-                <div>Last seen: {new Date(message.lastSeen).toLocaleTimeString()}</div>
+                {track.reg ? <div>Registration: {track.reg}</div> : null}
+                {track.country ? <div>Country: {track.country}</div> : null}
+                {track.alt != null ? <div>Altitude: {track.alt.toFixed(0)} ft</div> : null}
+                {track.speed != null ? <div>Speed: {track.speed.toFixed(0)} kt</div> : null}
+                {track.heading != null ? <div>Heading: {track.heading.toFixed(0)}&deg;</div> : null}
+                <div>Last seen: {new Date(track.lastSeen).toLocaleTimeString()}</div>
               </div>
             </Tooltip>
           </Marker>
