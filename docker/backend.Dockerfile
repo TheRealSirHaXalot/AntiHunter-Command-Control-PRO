@@ -41,7 +41,10 @@ COPY --from=builder /app/apps/backend/package.json ./apps/backend/package.json
 
 # Install production dependencies only for @command-center/backend
 RUN pnpm install --frozen-lockfile --prod --filter @command-center/backend...
-RUN pnpm --filter @command-center/backend prisma:generate
+
+# Generate Prisma client: prisma CLI is a devDep, use npx to fetch it temporarily
+RUN npx -y prisma@5.22.0 generate --schema=apps/backend/prisma/schema.prisma \
+    && rm -rf /root/.npm/_npx
 
 # Provide udevadm for serialport enumeration inside the container
 RUN apt-get update  && apt-get install -y --no-install-recommends udev  && rm -rf /var/lib/apt/lists/*
