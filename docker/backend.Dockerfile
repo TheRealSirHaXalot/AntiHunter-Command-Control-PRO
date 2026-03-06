@@ -21,6 +21,14 @@ COPY . .
 # Generate Prisma client and build the NestJS backend
 RUN pnpm --filter @command-center/backend prisma:generate  && pnpm --filter @command-center/backend build
 
+# Compile seed.ts for production (ts-node is a devDep, unavailable at runtime).
+# Copy seed into src/ so it shares the same rootDir, rewrite import path, compile.
+RUN cd apps/backend \
+    && cp prisma/seed.ts src/seed.ts \
+    && sed -i "s|from '../src/|from './|g" src/seed.ts \
+    && pnpm exec tsc -p tsconfig.build.json \
+    && rm src/seed.ts
+
 FROM node:20.19.6-trixie-slim AS runtime
 WORKDIR /app
 

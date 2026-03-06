@@ -13,5 +13,10 @@ if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
   npx prisma migrate deploy
 fi
 
+if [ "${RUN_SEED:-true}" = "true" ]; then
+  echo "Running database seed..."
+  node dist/seed.js
+fi
+
 echo "Starting backend..."
 exec node dist/main.js
