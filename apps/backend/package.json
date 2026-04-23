@@ -23,7 +23,7 @@
     "@meshtastic/protobufs": "^2.7.8",
     "@nestjs/common": "^10.3.8",
     "@nestjs/config": "^3.2.2",
-    "@nestjs/core": "^10.3.8",
+    "@nestjs/core": "^11.1.18",
     "@nestjs/mapped-types": "^2.0.4",
     "@nestjs/platform-express": "^10.3.8",
     "@nestjs/platform-socket.io": "^10.3.8",
