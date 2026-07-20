@@ -168,20 +168,15 @@ const SENTINEL_STATUS_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*SENTINEL_STATUS:\s*en=(?<enabled>\d)\s+run=(?<running>\d)/i;
 const SENTINEL_MODE_ACK_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*SENTINEL_MODE_ACK:(?<mode>scan|defend|FAIL)/i;
-const SENTINEL_BOOT_ACK_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):\s*SENTINEL_BOOT_ACK:(?<state>on|off)/i;
-const GROUP_ACK_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):\s*GROUP_ACK:(?<status>OK|FAIL):(?<rest>.+)$/i;
-const DETECT_CFG_ACK_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):\s*DETECT_CFG_ACK:(?<status>OK|FAIL)/i;
+const SENTINEL_BOOT_ACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*SENTINEL_BOOT_ACK:(?<state>on|off)/i;
+const GROUP_ACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*GROUP_ACK:(?<status>OK|FAIL):(?<rest>.+)$/i;
+const DETECT_CFG_ACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*DETECT_CFG_ACK:(?<status>OK|FAIL)/i;
 const DETECT_CFG_LEN_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*DETECT_CFG_LEN:(?<len>\d+)/i;
 const INCIDENTS_LEN_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*INCIDENTS_LEN:(?<len>\d+)/i;
 const INCIDENTS_CLEAR_ACK_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*INCIDENTS_CLEAR_ACK:(?<status>[A-Z_]+)/i;
-const DEDUP_CLEAR_ACK_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):\s*DEDUP_CLEAR_ACK:(?<status>[A-Z_]+)/i;
-const FACTORY_RESET_ACK_REGEX =
-  /^(?<id>[A-Za-z0-9_.:-]+):\s*FACTORY_RESET_ACK:(?<status>.+)$/i;
+const DEDUP_CLEAR_ACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*DEDUP_CLEAR_ACK:(?<status>[A-Z_]+)/i;
+const FACTORY_RESET_ACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*FACTORY_RESET_ACK:(?<status>.+)$/i;
 
 const NODE_ID_FALLBACK = /^([A-Za-z0-9_.:-]+)/;
 

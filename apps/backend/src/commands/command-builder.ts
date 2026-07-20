@@ -8,7 +8,16 @@ const CUSTOM_NODE_ID_PATTERN = /^[A-Z0-9]{2,6}$/;
 
 const SENTINEL_MODES = new Set(['scan', 'defend']);
 const SENTINEL_BOOT_STATES = new Set(['on', 'off', '1', '0', 'true', 'false']);
-const GROUP_NAMES = new Set(['dos', 'rogue', 'rogue_ap', 'recon', 'physical', 'phys', 'mesh', 'all']);
+const GROUP_NAMES = new Set([
+  'dos',
+  'rogue',
+  'rogue_ap',
+  'recon',
+  'physical',
+  'phys',
+  'mesh',
+  'all',
+]);
 const GROUP_STATES = new Set(['on', 'off', '1', '0', 'true', 'false']);
 const FACTORY_RESET_TIERS = new Set(['FULL', 'CONFIG', 'DATA']);
 
@@ -508,7 +517,9 @@ function handleSentinelBoot(params: string[]): string[] {
   if (!SENTINEL_BOOT_STATES.has(value)) {
     throw new BadRequestException('SENTINEL_BOOT must be on or off.');
   }
-  return [value === '1' || value === 'true' ? 'on' : value === '0' || value === 'false' ? 'off' : value];
+  return [
+    value === '1' || value === 'true' ? 'on' : value === '0' || value === 'false' ? 'off' : value,
+  ];
 }
 
 function handleGroup(params: string[]): string[] {
