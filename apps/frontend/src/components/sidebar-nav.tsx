@@ -15,6 +15,7 @@ import {
   MdSensors,
   MdSettings,
   MdSettingsInputAntenna,
+  MdShield,
   MdTerminal,
   MdWifiTethering,
 } from 'react-icons/md';
@@ -40,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/adsb', label: 'ADS-B', icon: MdRadar },
   { to: '/geofences', label: 'Geofences', icon: MdOutlineAreaChart },
   { to: '/nodes', label: 'Nodes', icon: MdSensors },
+  { to: '/sentinel', label: 'Sentinel', icon: MdShield },
   { to: '/scheduler', label: 'Scheduler', icon: MdEventNote },
   { to: '/strategy', label: 'Strategy Advisor', icon: MdHub, hideOnMobile: true },
   { to: '/chat', label: 'Chat', icon: MdChat },
@@ -59,6 +61,7 @@ export function SidebarNav() {
   const [chatEnabled, setChatEnabled] = useState<boolean>(addons.chat ?? false);
   const [adsbEnabled, setAdsbEnabled] = useState<boolean>(addons.adsb ?? false);
   const [acarsEnabled, setAcarsEnabled] = useState<boolean>(addons.acars ?? false);
+  const [sentinelEnabled, setSentinelEnabled] = useState<boolean>(addons.sentinel ?? false);
 
   useEffect(() => {
     setStrategyEnabled(addons.strategy ?? false);
@@ -67,7 +70,16 @@ export function SidebarNav() {
     setChatEnabled(addons.chat ?? false);
     setAdsbEnabled(addons.adsb ?? false);
     setAcarsEnabled(addons.acars ?? false);
-  }, [addons.alerts, addons.chat, addons.scheduler, addons.strategy, addons.adsb, addons.acars]);
+    setSentinelEnabled(addons.sentinel ?? false);
+  }, [
+    addons.alerts,
+    addons.chat,
+    addons.scheduler,
+    addons.strategy,
+    addons.adsb,
+    addons.acars,
+    addons.sentinel,
+  ]);
 
   const navItems = useMemo(() => {
     return NAV_ITEMS.filter((item) => {
@@ -77,9 +89,18 @@ export function SidebarNav() {
       if (item.to === '/chat') return chatEnabled;
       if (item.to === '/adsb') return adsbEnabled;
       if (item.to === '/acars') return acarsEnabled;
+      if (item.to === '/sentinel') return sentinelEnabled;
       return true;
     });
-  }, [strategyEnabled, alertsEnabled, schedulerEnabled, chatEnabled, adsbEnabled, acarsEnabled]);
+  }, [
+    strategyEnabled,
+    alertsEnabled,
+    schedulerEnabled,
+    chatEnabled,
+    adsbEnabled,
+    acarsEnabled,
+    sentinelEnabled,
+  ]);
 
   return (
     <aside className="sidebar">

@@ -32,6 +32,7 @@ import { MapPage } from './pages/MapPage';
 import { NodesPage } from './pages/NodesPage';
 import { ProbeInventoryPage } from './pages/ProbeInventoryPage';
 import { SchedulerPage } from './pages/SchedulerPage';
+import { SentinelPage } from './pages/SentinelPage';
 import { StrategyAdvisorPage } from './pages/StrategyAdvisorPage';
 import { TargetsPage } from './pages/TargetsPage';
 import { TerminalEventsPage } from './pages/TerminalEventsPage';
@@ -48,6 +49,9 @@ export default function App() {
   const user = useAuthStore((state) => state.user);
   const chatEnabled =
     useAuthStore((state) => state.user?.preferences?.notifications?.addons?.chat ?? false) ?? false;
+  const sentinelEnabled =
+    useAuthStore((state) => state.user?.preferences?.notifications?.addons?.sentinel ?? false) ??
+    false;
   const { setTheme } = useTheme();
   const setDrones = useDroneStore((state) => state.setDrones);
 
@@ -141,6 +145,7 @@ export default function App() {
               <Route path="/alerts/events" element={<AlertsEventLogPage />} />
               <Route path="/console" element={<CommandConsolePage />} />
               {chatEnabled ? <Route path="/chat" element={<ChatPage />} /> : null}
+              {sentinelEnabled ? <Route path="/sentinel" element={<SentinelPage />} /> : null}
               <Route path="/terminal" element={<TerminalEventsPage />} />
               <Route path="/addon" element={<AddonPage />} />
               <Route path="/config" element={<ConfigPage />} />
