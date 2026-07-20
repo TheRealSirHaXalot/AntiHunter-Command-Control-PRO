@@ -42,6 +42,8 @@ export function SentinelPage() {
   const [target, setTarget] = useState('@ALL');
   const [siteId, setSiteId] = useState<string | undefined>(undefined);
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
+  const [selectedMode, setSelectedMode] = useState<string | null>(null);
+  const [selectedBoot, setSelectedBoot] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ level: 'ok' | 'error'; message: string } | null>(null);
 
   const targetOptions = useMemo(() => {
@@ -73,6 +75,10 @@ export function SentinelPage() {
   };
 
   const statuses = useMemo(() => Object.values(statusMap), [statusMap]);
+  const runningCount = useMemo(
+    () => statuses.filter((status) => status.running).length,
+    [statuses],
+  );
 
   const typeCounts = useMemo(() => {
     const counts = new Map<string, { label: string; count: number }>();
@@ -126,118 +132,156 @@ export function SentinelPage() {
       <article className="config-card">
         <div className="panel__header">
           <h2 className="panel__title">Sentinel Control</h2>
+          {statuses.length > 0 ? (
+            <span className="status-pill">
+              {runningCount} running / {statuses.length} reporting
+            </span>
+          ) : null}
         </div>
-        <div className="form-row">
-          <label htmlFor="sentinel-target">Target</label>
-          <select
-            id="sentinel-target"
-            value={target}
-            onChange={(event) => setTarget(event.target.value)}
-          >
-            {targetOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        {sites && sites.length > 1 ? (
-          <div className="form-row">
-            <label htmlFor="sentinel-site">Site</label>
-            <select
-              id="sentinel-site"
-              value={siteId ?? ''}
-              onChange={(event) => setSiteId(event.target.value || undefined)}
-            >
-              <option value="">All sites</option>
-              {sites.map((site) => (
-                <option key={site.id} value={site.id}>
-                  {site.name ?? site.id}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : null}
-
-        <div className="sentinel-controls">
-          <button
-            type="button"
-            className="control-chip control-chip--primary"
-            disabled={!canSend || busy}
-            onClick={() => send('SENTINEL_ON')}
-          >
-            Start
-          </button>
-          <button
-            type="button"
-            className="control-chip control-chip--danger"
-            disabled={!canSend || busy}
-            onClick={() => send('SENTINEL_OFF')}
-          >
-            Stop
-          </button>
-          <button
-            type="button"
-            className="control-chip control-chip--ghost"
-            disabled={!canSend || busy}
-            onClick={() => send('SENTINEL_STATUS')}
-          >
-            <MdRefresh /> Query Status
-          </button>
-        </div>
-
-        <div className="sentinel-control-group">
-          <span className="form-label">Radio mode</span>
-          <div className="sentinel-controls">
-            {SENTINEL_MODES.map((mode) => (
-              <button
-                key={mode.value}
-                type="button"
-                className="control-chip"
-                disabled={!canSend || busy}
-                onClick={() => send('SENTINEL_MODE', [mode.value])}
+        <div className="sentinel-control-grid">
+          <div className="sentinel-control-col">
+            <div className="sentinel-field">
+              <label htmlFor="sentinel-target">Target</label>
+              <select
+                id="sentinel-target"
+                value={target}
+                onChange={(event) => setTarget(event.target.value)}
               >
-                {mode.label}
-              </button>
-            ))}
-          </div>
-        </div>
+                {targetOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {sites && sites.length > 1 ? (
+              <div className="sentinel-field">
+                <label htmlFor="sentinel-site">Site</label>
+                <select
+                  id="sentinel-site"
+                  value={siteId ?? ''}
+                  onChange={(event) => setSiteId(event.target.value || undefined)}
+                >
+                  <option value="">All sites</option>
+                  {sites.map((site) => (
+                    <option key={site.id} value={site.id}>
+                      {site.name ?? site.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
 
-        <div className="sentinel-control-group">
-          <span className="form-label">Start on boot</span>
-          <div className="sentinel-controls">
-            <button
-              type="button"
-              className="control-chip"
-              disabled={!canSend || busy}
-              onClick={() => send('SENTINEL_BOOT', ['on'])}
-            >
-              On
-            </button>
-            <button
-              type="button"
-              className="control-chip"
-              disabled={!canSend || busy}
-              onClick={() => send('SENTINEL_BOOT', ['off'])}
-            >
-              Off
-            </button>
-          </div>
-        </div>
+            <div className="sentinel-block">
+              <span className="form-label">Power</span>
+              <div className="sentinel-controls">
+                <button
+                  type="button"
+                  className="control-chip control-chip--primary"
+                  disabled={!canSend || busy}
+                  onClick={() => send('SENTINEL_ON')}
+                >
+                  Start
+                </button>
+                <button
+                  type="button"
+                  className="control-chip control-chip--danger"
+                  disabled={!canSend || busy}
+                  onClick={() => send('SENTINEL_OFF')}
+                >
+                  Stop
+                </button>
+                <button
+                  type="button"
+                  className="control-chip control-chip--ghost"
+                  disabled={!canSend || busy}
+                  onClick={() => send('SENTINEL_STATUS')}
+                >
+                  <MdRefresh /> Query Status
+                </button>
+              </div>
+            </div>
 
-        <div className="sentinel-status-list">
-          {statuses.length === 0 ? (
-            <p className="form-hint">
-              No status reported yet. Press “Query Status” to request it from the node(s).
-            </p>
-          ) : (
-            statuses.map((status) => (
-              <span key={`${status.siteId ?? 'default'}-${status.nodeId}`} className="status-pill">
-                {status.nodeId}: {status.enabled ? 'enabled' : 'disabled'}
-                {status.running ? ' · running' : ' · idle'}
-              </span>
-            ))
-          )}
+            <div className="sentinel-block">
+              <span className="form-label">Radio mode</span>
+              <div className="sentinel-controls">
+                {SENTINEL_MODES.map((mode) => (
+                  <button
+                    key={mode.value}
+                    type="button"
+                    className={`control-chip${selectedMode === mode.value ? ' is-active' : ''}`}
+                    disabled={!canSend || busy}
+                    onClick={() => {
+                      setSelectedMode(mode.value);
+                      send('SENTINEL_MODE', [mode.value]);
+                    }}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="sentinel-block">
+              <span className="form-label">Start on boot</span>
+              <div className="sentinel-controls">
+                <button
+                  type="button"
+                  className={`control-chip${selectedBoot === 'on' ? ' is-active' : ''}`}
+                  disabled={!canSend || busy}
+                  onClick={() => {
+                    setSelectedBoot('on');
+                    send('SENTINEL_BOOT', ['on']);
+                  }}
+                >
+                  On
+                </button>
+                <button
+                  type="button"
+                  className={`control-chip${selectedBoot === 'off' ? ' is-active' : ''}`}
+                  disabled={!canSend || busy}
+                  onClick={() => {
+                    setSelectedBoot('off');
+                    send('SENTINEL_BOOT', ['off']);
+                  }}
+                >
+                  Off
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="sentinel-node-panel">
+            <h3>Node Status</h3>
+            {statuses.length === 0 ? (
+              <p className="form-hint">
+                No status reported yet. Press “Query Status” to request it from the node(s).
+              </p>
+            ) : (
+              statuses.map((status) => {
+                const state = status.running ? 'run' : status.enabled ? 'idle' : 'off';
+                const meta = status.running ? 'running' : status.enabled ? 'idle' : 'disabled';
+                return (
+                  <div
+                    key={`${status.siteId ?? 'default'}-${status.nodeId}`}
+                    className="sentinel-node"
+                  >
+                    <span
+                      className={`sentinel-node__dot${
+                        state === 'run'
+                          ? ' sentinel-node__dot--run'
+                          : state === 'idle'
+                            ? ' sentinel-node__dot--idle'
+                            : ''
+                      }`}
+                    />
+                    <span className="sentinel-node__id">{status.nodeId}</span>
+                    <span className="sentinel-node__meta">{meta}</span>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
       </article>
 
