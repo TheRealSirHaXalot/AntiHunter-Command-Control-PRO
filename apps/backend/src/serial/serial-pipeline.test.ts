@@ -57,7 +57,7 @@ function sanitizeLine(value: string): string {
   }
 
   const HOP_KEYWORD_RE =
-    /^(?:STATUS|Target|DEVICE|DRONE|PROBE_HIT|PROBE_ACK|ATTACK|ANOMALY|VIBRATION|VIBRATION_STATUS|VIBRATION_ON_ACK|VIBRATION_OFF_ACK|SETUP_MODE|SETUP_COMPLETE|TAMPER_DETECTED|TAMPER_CANCELLED|ERASE_|AUTOERASE_|BASELINE_STATUS|BASELINE_ACK|BATTERY_SAVER_STATUS|BATTERY_SAVER_START_ACK|BATTERY_SAVER_STOP_ACK|HEARTBEAT|STARTUP|GPS|TRIANGULATE|TARGET_DATA|T_D:|T_C:|T_F:|IDENTITY|RANDOMIZATION|RANDOMIZATION_DONE|SCAN_DONE|DEAUTH_DONE|DRONE_DONE|BASELINE_DONE|LIST_SCAN_DONE|PROBE_DONE|SCAN_ACK|DEVICE_SCAN_ACK|DRONE_ACK|DEAUTH_ACK|CONFIG_ACK|STOP_ACK|REBOOT_ACK|HB_ACK|TRI_START|WIPE_TOKEN|ERASE_TOKEN|RTC_SYNC|TIME_SYNC|CODES:|Time:)/i;
+    /^(?:STATUS|Target|DEVICE|DRONE|PROBE_HIT|PROBE_ACK|ATTACK|ANOMALY|VIBRATION|VIBRATION_STATUS|VIBRATION_ON_ACK|VIBRATION_OFF_ACK|SETUP_MODE|SETUP_COMPLETE|TAMPER_DETECTED|TAMPER_CANCELLED|ERASE_|AUTOERASE_|BASELINE_STATUS|BASELINE_ACK|BATTERY_SAVER_STATUS|BATTERY_SAVER_START_ACK|BATTERY_SAVER_STOP_ACK|HEARTBEAT|STARTUP|GPS|TRIANGULATE|TARGET_DATA|T_D:|T_C:|T_F:|IDENTITY|RANDOMIZATION|RANDOMIZATION_DONE|SCAN_DONE|DEAUTH_DONE|DRONE_DONE|BASELINE_DONE|LIST_SCAN_DONE|PROBE_DONE|SCAN_ACK|DEVICE_SCAN_ACK|DRONE_ACK|DEAUTH_ACK|CONFIG_ACK|STOP_ACK|REBOOT_ACK|HB_ACK|TRI_START|WIPE_TOKEN|ERASE_TOKEN|RTC_SYNC|TIME_SYNC|CODES:|EVILTWIN|OWE_ABUSE|PMKID_|EAPOL_BAIT|HSHK|KARMA_|KRACK|PWNAGOTCHI|PROBE_FLOOD|SAE_DOS|DEAUTH_FLOOD|DEAUTH_FORGE|DEAUTH_AP_TARGETED|BEACON_|ASSOC_SLEEP|AUTH_FLOOD|SSID_CONFUSION|FRAG|ATTACKER_HUNT|RECON|JAMMING|SENTINEL|GROUP_ACK|DETECT_CFG|INCIDENTS|DEDUP_CLEAR_ACK|FACTORY_RESET|MESH_SPOOF_SELF|MESH_FLOOD|MESH_CMD_INJECT|DEVICE_DISAPPEARED|RID_|TOF_|BLOOM|IDHASH|CHAN_ASSIGN|Time:)/i;
   const hopMatch = /^([A-Za-z0-9_-]{1,6}):\s+([A-Za-z0-9_.:-]+:\s+)(.+)$/i.exec(cleaned);
   if (hopMatch) {
     const secondToken = hopMatch[2].replace(/[:\s]+$/, '');
@@ -567,6 +567,57 @@ const FIRMWARE_MESSAGES: TestCase[] = [
     input: 'AH5: VIBRATION_OFF_ACK:OK',
     expectKinds: ['command-ack'],
   },
+
+  // ─── SENTINEL DETECTIONS ───
+  { name: 'EVILTWIN', input: 'AH5: EVILTWIN:AA:BB:CC:DD:EE:FF:tsf_anomaly:-45', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'OWE_ABUSE', input: 'AH5: OWE_ABUSE:AA:BB:CC:DD:EE:FF:MyNet:-50', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'PMKID_FORGE', input: 'AH5: PMKID_FORGE:AA:BB:CC:DD:EE:FF:FAKE_M1:-58', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'PMKID_HARVEST', input: 'AH5: PMKID_HARVEST:AA:BB:CC:DD:EE:FF:11:22:33:44:55:66:-60', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'EAPOL_BAIT', input: 'AH5: EAPOL_BAIT:AA:BB:CC:DD:EE:FF:11:22:33:44:55:66:3:-55:80', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'HSHK', input: 'AH5: HSHK:AA:BB:CC:DD:EE:FF:11:22:33:44:55:66:2:5:-55', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'KARMA_CAND', input: 'AH5: KARMA_CAND:AA:BB:CC:DD:EE:FF:4', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'KARMA_CONFIRMED', input: 'AH5: KARMA_CONFIRMED:AA:BB:CC:DD:EE:FF:-50', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'KRACK', input: 'AH5: KRACK:AA:BB:CC:DD:EE:FF:11:22:33:44:55:66:7', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'PWNAGOTCHI', input: 'AH5: PWNAGOTCHI:AA:BB:CC:DD:EE:FF:-48', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'PROBE_FLOOD', input: 'AH5: PROBE_FLOOD:MyNet:120:-40', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'PROBE_FLOOD_BEHAVE', input: 'AH5: PROBE_FLOOD_BEHAVE:MyNet:src=7:-42', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'PROBE_FLOOD_AP', input: 'AH5: PROBE_FLOOD_AP:15:-38', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'SAE_DOS', input: 'AH5: SAE_DOS:AA:BB:CC:DD:EE:FF:12', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'DEAUTH_FLOOD', input: 'AH5: DEAUTH_FLOOD:AA:BB:CC:DD:EE:FF:42:-38', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'DEAUTH_FORGE', input: 'AH5: DEAUTH_FORGE:AA:BB:CC:DD:EE:FF:tool_x:-40', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'DEAUTH_AP_TARGETED', input: 'AH5: DEAUTH_AP_TARGETED:AA:BB:CC:DD:EE:FF:targeted:9', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'BEACON_FLOOD', input: 'AH5: BEACON_FLOOD:35', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'BEACON_FORGE', input: 'AH5: BEACON_FORGE:AA:BB:CC:DD:EE:FF:reason:-44', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'ASSOC_SLEEP', input: 'AH5: ASSOC_SLEEP:AA:BB:CC:DD:EE:FF:8:-46', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'AUTH_FLOOD', input: 'AH5: AUTH_FLOOD:AA:BB:CC:DD:EE:FF:30:-41', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'SSID_CONFUSION', input: 'AH5: SSID_CONFUSION:AA:BB:CC:DD:EE:FF:3', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'FRAG', input: 'AH5: FRAG:AA:BB:CC:DD:EE:FF:overlap', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'JAMMING', input: 'AH5: JAMMING:6:88:120', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'ATTACKER_HUNT', input: 'AH5: ATTACKER_HUNT:AA:BB:CC:DD:EE:FF:DEAUTH', expectKinds: ['alert'], expectCategory: 'sentinel' },
+  { name: 'RECON', input: 'AH5: RECON:T-abc123:87', expectKinds: ['alert'], expectCategory: 'sentinel' },
+
+  // ─── SENTINEL / CONFIG ACKS ───
+  { name: 'SENTINEL_ACK ON', input: 'AH5: SENTINEL_ACK:ON run=1', expectKinds: ['command-ack', 'alert'] },
+  { name: 'SENTINEL_ACK OFF', input: 'AH5: SENTINEL_ACK:OFF', expectKinds: ['command-ack', 'alert'] },
+  { name: 'SENTINEL_STATUS', input: 'AH5: SENTINEL_STATUS: en=1 run=0', expectKinds: ['command-result', 'alert'] },
+  { name: 'SENTINEL_MODE_ACK', input: 'AH5: SENTINEL_MODE_ACK:scan', expectKinds: ['command-ack'] },
+  { name: 'SENTINEL_BOOT_ACK', input: 'AH5: SENTINEL_BOOT_ACK:on', expectKinds: ['command-ack'] },
+  { name: 'GROUP_ACK', input: 'AH5: GROUP_ACK:OK:dos:on', expectKinds: ['command-ack'] },
+  { name: 'DETECT_CFG_ACK', input: 'AH5: DETECT_CFG_ACK:OK', expectKinds: ['command-ack'] },
+  { name: 'DETECT_CFG_LEN', input: 'AH5: DETECT_CFG_LEN:128 (see serial)', expectKinds: ['command-result'] },
+  { name: 'INCIDENTS_LEN', input: 'AH5: INCIDENTS_LEN:12 (see serial)', expectKinds: ['command-result'] },
+  { name: 'INCIDENTS_CLEAR_ACK', input: 'AH5: INCIDENTS_CLEAR_ACK:OK', expectKinds: ['command-ack'] },
+  { name: 'DEDUP_CLEAR_ACK', input: 'AH5: DEDUP_CLEAR_ACK:OK', expectKinds: ['command-ack'] },
+  { name: 'FACTORY_RESET_ACK', input: 'AH5: FACTORY_RESET_ACK:FULL - rebooting', expectKinds: ['command-ack'] },
+
+  // ─── MESH GUARD / COORDINATION / NODE EVENTS ───
+  { name: 'MESH_CMD_INJECT', input: 'AH5: MESH_CMD_INJECT:BADNODE:@ALL TRIANGULATE', expectKinds: ['alert'], expectCategory: 'mesh-guard' },
+  { name: 'MESH_FLOOD', input: 'AH5: MESH_FLOOD:250', expectKinds: ['alert'], expectCategory: 'mesh-guard' },
+  { name: 'TOF_PING', input: 'AH5: TOF_PING:*:5:123456', expectKinds: ['alert'], expectCategory: 'mesh-coordination' },
+  { name: 'CHAN_ASSIGN', input: 'AH5: CHAN_ASSIGN:AH6:1,6,11', expectKinds: ['alert'], expectCategory: 'mesh-coordination' },
+  { name: 'DEVICE_DISAPPEARED', input: 'AH5: DEVICE_DISAPPEARED: AA:BB:CC:DD:EE:FF absent:300s', expectKinds: ['alert'], expectCategory: 'baseline' },
+  { name: 'RID_RX', input: 'AH5: RID_RX:DRONE1:-70:37.1:-122.2:1', expectKinds: ['alert'], expectCategory: 'drone' },
+  { name: 'RID_CLAIM', input: 'AH5: RID_CLAIM:DRONE1:37.1:-122.2:100.5', expectKinds: ['alert'], expectCategory: 'drone' },
 ];
 
 // ── Wrapper formats ──

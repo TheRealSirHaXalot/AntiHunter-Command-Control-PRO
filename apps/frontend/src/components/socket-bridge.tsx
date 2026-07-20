@@ -503,7 +503,9 @@ export function SocketBridge() {
           void queryClient.invalidateQueries({ queryKey: ['targets'] });
         },
       });
-      addEntry(entry);
+      if (entry) {
+        addEntry(entry);
+      }
       const alarmLevel = extractAlarmLevel(payload);
       if (alarmLevel) {
         const playbackLevel: AlarmLevel = alarmLevel === 'CRITICAL' ? 'ALERT' : alarmLevel;
@@ -844,7 +846,7 @@ function normalizeDroneStatus(value: unknown): DroneStatus {
 function parseEventPayload(
   payload: unknown,
   options?: { onTriangulationComplete?: () => void },
-): TerminalEntryInput {
+): TerminalEntryInput | null {
   if (typeof payload === 'string') {
     return { message: payload, level: 'info', source: 'ws' };
   }
@@ -866,6 +868,10 @@ function parseEventPayload(
     if (base.type === 'event.alert') {
       const levelRaw = typeof base.level === 'string' ? base.level.toUpperCase() : undefined;
       const category = typeof base.category === 'string' ? base.category.toLowerCase() : undefined;
+
+      if (category === 'mesh-coordination') {
+        return null;
+      }
 
       const baseMessage = base.message ?? `Alert from ${base.nodeId ?? 'unknown node'}`;
       const messageUpper = baseMessage.toUpperCase();
