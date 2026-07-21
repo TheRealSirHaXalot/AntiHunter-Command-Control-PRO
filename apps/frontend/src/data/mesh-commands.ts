@@ -2,6 +2,7 @@ export type CommandGroup =
   | 'Configuration'
   | 'Scanning'
   | 'Detection'
+  | 'Sentinel'
   | 'Triangulation'
   | 'Status'
   | 'Security';
@@ -682,12 +683,256 @@ export const MESH_COMMANDS: CommandDefinition[] = [
       { target: '@ALL', params: ['10'] },
     ],
   },
+  {
+    name: 'SENTINEL_ON',
+    group: 'Sentinel',
+    description: 'Enable the sentinel WiFi attack detector.',
+    defaultTarget: '@ALL',
+    parameters: [],
+    examples: [{ target: '@ALL', params: [] }],
+  },
+  {
+    name: 'SENTINEL_OFF',
+    group: 'Sentinel',
+    description: 'Disable the sentinel WiFi attack detector.',
+    defaultTarget: '@ALL',
+    parameters: [],
+    examples: [{ target: '@ALL', params: [] }],
+  },
+  {
+    name: 'SENTINEL_STATUS',
+    group: 'Sentinel',
+    description: 'Report sentinel enabled/running state.',
+    defaultTarget: '@ALL',
+    parameters: [],
+    examples: [{ target: '@ALL', params: [] }],
+  },
+  {
+    name: 'SENTINEL_MODE',
+    group: 'Sentinel',
+    description: 'Set sentinel mode (scan or defend).',
+    defaultTarget: '@ALL',
+    parameters: [
+      {
+        key: 'mode',
+        label: 'Mode',
+        type: 'select',
+        required: true,
+        options: [
+          { label: 'Scan', value: 'scan' },
+          { label: 'Defend', value: 'defend' },
+        ],
+      },
+    ],
+    examples: [{ target: '@ALL', params: ['scan'] }],
+  },
+  {
+    name: 'SENTINEL_BOOT',
+    group: 'Sentinel',
+    description: 'Set whether sentinel starts automatically on boot.',
+    defaultTarget: '@ALL',
+    parameters: [
+      {
+        key: 'state',
+        label: 'Boot Enable',
+        type: 'select',
+        required: true,
+        options: [
+          { label: 'On', value: 'on' },
+          { label: 'Off', value: 'off' },
+        ],
+      },
+    ],
+    examples: [{ target: '@ALL', params: ['on'] }],
+  },
+  {
+    name: 'GROUP',
+    group: 'Sentinel',
+    description: 'Enable or disable a sentinel detector group.',
+    defaultTarget: '@ALL',
+    parameters: [
+      {
+        key: 'name',
+        label: 'Group',
+        type: 'select',
+        required: true,
+        options: [
+          { label: 'DoS', value: 'dos' },
+          { label: 'Rogue AP', value: 'rogue' },
+          { label: 'Recon', value: 'recon' },
+          { label: 'Physical', value: 'physical' },
+          { label: 'Mesh', value: 'mesh' },
+          { label: 'All', value: 'all' },
+        ],
+      },
+      {
+        key: 'state',
+        label: 'State',
+        type: 'select',
+        required: true,
+        options: [
+          { label: 'On', value: 'on' },
+          { label: 'Off', value: 'off' },
+        ],
+      },
+    ],
+    examples: [{ target: '@ALL', params: ['dos', 'on'] }],
+  },
+  {
+    name: 'DETECT_CFG',
+    group: 'Sentinel',
+    description: 'Apply detector tunables as a JSON payload.',
+    defaultTarget: '@NODE_22',
+    parameters: [
+      {
+        key: 'json',
+        label: 'Config JSON',
+        type: 'text',
+        placeholder: '{"eviltwin":true,"pmkid":false}',
+        helper: 'Valid JSON, 180 characters or fewer.',
+        required: true,
+      },
+    ],
+    examples: [{ target: '@NODE_22', params: ['{"eviltwin":true}'] }],
+  },
+  {
+    name: 'DETECT_CFG_GET',
+    group: 'Sentinel',
+    description: 'Request the current detector configuration.',
+    defaultTarget: '@NODE_22',
+    parameters: [],
+    examples: [{ target: '@NODE_22', params: [] }],
+  },
+  {
+    name: 'INCIDENTS',
+    group: 'Sentinel',
+    description: 'Request the sentinel incident log (optional count).',
+    defaultTarget: '@NODE_22',
+    parameters: [
+      {
+        key: 'count',
+        label: 'Count',
+        type: 'number',
+        placeholder: '50',
+        helper: 'Optional. Between 1 and 200.',
+        required: false,
+        min: 1,
+        max: 200,
+        step: 1,
+      },
+    ],
+    examples: [
+      { target: '@NODE_22', params: [] },
+      { target: '@NODE_22', params: ['50'] },
+    ],
+  },
+  {
+    name: 'INCIDENTS_CLEAR',
+    group: 'Sentinel',
+    description: 'Clear the sentinel incident log.',
+    defaultTarget: '@NODE_22',
+    parameters: [],
+    examples: [{ target: '@NODE_22', params: [] }],
+  },
+  {
+    name: 'CONFIG_DEDUP_TTL',
+    group: 'Configuration',
+    description: 'Set the mesh de-duplication TTL (seconds).',
+    defaultTarget: '@ALL',
+    parameters: [
+      {
+        key: 'ttl',
+        label: 'TTL (seconds)',
+        type: 'number',
+        placeholder: '300',
+        helper: 'Between 0 and 3600 seconds.',
+        required: true,
+        min: 0,
+        max: 3600,
+        step: 1,
+        suffix: 'sec',
+      },
+    ],
+    examples: [{ target: '@ALL', params: ['300'] }],
+  },
+  {
+    name: 'CONFIG_SESSION_DEDUP',
+    group: 'Configuration',
+    description: 'Toggle per-session de-duplication.',
+    defaultTarget: '@ALL',
+    parameters: [
+      {
+        key: 'enabled',
+        label: 'Session Dedup',
+        type: 'select',
+        required: true,
+        options: [
+          { label: 'Enabled', value: '1' },
+          { label: 'Disabled', value: '0' },
+        ],
+      },
+    ],
+    examples: [{ target: '@ALL', params: ['1'] }],
+  },
+  {
+    name: 'MESH_DEDUP_CLEAR',
+    group: 'Configuration',
+    description: 'Clear the mesh de-duplication cache.',
+    defaultTarget: '@ALL',
+    parameters: [],
+    examples: [{ target: '@ALL', params: [] }],
+  },
+  {
+    name: 'CONFIG_ERASE_PSK',
+    group: 'Security',
+    description: 'Set the pre-shared key used to authorize erase and factory reset.',
+    defaultTarget: '@NODE_22',
+    parameters: [
+      {
+        key: 'key',
+        label: 'Pre-Shared Key',
+        type: 'text',
+        placeholder: 'shared-secret',
+        helper: '1 to 64 characters.',
+        required: true,
+      },
+    ],
+    examples: [{ target: '@NODE_22', params: ['shared-secret'] }],
+  },
+  {
+    name: 'FACTORY_RESET',
+    group: 'Security',
+    description: 'Factory reset a node (requires erase PSK credential).',
+    defaultTarget: '@NODE_22',
+    parameters: [
+      {
+        key: 'tier',
+        label: 'Reset Tier',
+        type: 'select',
+        required: true,
+        options: [
+          { label: 'Full', value: 'FULL' },
+          { label: 'Config', value: 'CONFIG' },
+          { label: 'Data', value: 'DATA' },
+        ],
+      },
+      {
+        key: 'credential',
+        label: 'Credential',
+        type: 'text',
+        placeholder: 'HMAC credential',
+        helper: 'Authorization derived from the erase PSK.',
+        required: true,
+      },
+    ],
+  },
 ];
 
 export const COMMAND_GROUP_ORDER: CommandGroup[] = [
   'Configuration',
   'Scanning',
   'Detection',
+  'Sentinel',
   'Triangulation',
   'Status',
   'Security',

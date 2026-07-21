@@ -94,6 +94,90 @@ const DONE_REGEX =
 
 const CODES_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*CODES:(?<codes>.*)$/i;
 
+const SENTINEL_DETECTION_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<type>DEAUTH_AP_TARGETED|DEAUTH_FLOOD|DEAUTH_FORGE|PROBE_FLOOD_BEHAVE|PROBE_FLOOD_AP|PROBE_FLOOD|PMKID_FORGE|PMKID_HARVEST|BEACON_FORGE|BEACON_FLOOD|KARMA_CONFIRMED|KARMA_CAND|EVILTWIN|OWE_ABUSE|ASSOC_SLEEP|SSID_CONFUSION|AUTH_FLOOD|SAE_DOS|EAPOL_BAIT|ATTACKER_HUNT|PWNAGOTCHI|KRACK|HSHK|JAMMING|FRAG|RECON):(?<rest>.*)$/i;
+
+const SENTINEL_FIELD_SCHEMAS: Record<string, string[]> = {
+  EAPOL_BAIT: ['src', 'dst', 'count', 'rssi', 'confidence'],
+  PMKID_FORGE: ['src', 'tag', 'rssi'],
+  PMKID_HARVEST: ['bssid', 'sta', 'rssi'],
+  HSHK: ['bssid', 'sta', 'msgNum', 'replayCtr', 'rssi'],
+  EVILTWIN: ['bssid', 'reason', 'rssi'],
+  OWE_ABUSE: ['bssid', 'ssid', 'rssi'],
+  BEACON_FLOOD: ['count'],
+  BEACON_FORGE: ['bssid', 'reason', 'rssi'],
+  DEAUTH_FLOOD: ['src', 'count', 'rssi'],
+  DEAUTH_FORGE: ['src', 'reason', 'rssi'],
+  DEAUTH_AP_TARGETED: ['mac', 'reason', 'count'],
+  ASSOC_SLEEP: ['bssid', 'count', 'rssi'],
+  PROBE_FLOOD: ['name', 'count', 'rssi'],
+  PROBE_FLOOD_BEHAVE: ['ssid', 'srcCount', 'rssi'],
+  PROBE_FLOOD_AP: ['distinct', 'rssi'],
+  SSID_CONFUSION: ['bssid', 'count'],
+  AUTH_FLOOD: ['bssid', 'count', 'rssi'],
+  SAE_DOS: ['bssid', 'count'],
+  FRAG: ['src', 'info'],
+  JAMMING: ['channel', 'pdr', 'errors'],
+  KARMA_CAND: ['bssid', 'ssids'],
+  KARMA_CONFIRMED: ['bssid', 'rssi'],
+  PWNAGOTCHI: ['bssid', 'rssi'],
+  ATTACKER_HUNT: ['mac', 'attackType'],
+  KRACK: ['bssid', 'sta', 'replayCtr'],
+  RECON: ['identityId', 'score'],
+};
+
+const SENTINEL_MAC_FIELDS = new Set(['mac', 'bssid', 'src', 'dst', 'sta', 'anchor']);
+const SENTINEL_STRING_FIELDS = new Set([
+  'mac',
+  'bssid',
+  'src',
+  'dst',
+  'sta',
+  'anchor',
+  'reason',
+  'info',
+  'ssid',
+  'name',
+  'tag',
+  'attackType',
+  'identityId',
+]);
+const SENTINEL_NOTICE_TYPES = new Set([
+  'RECON',
+  'KARMA_CAND',
+  'BEACON_FLOOD',
+  'PROBE_FLOOD_BEHAVE',
+]);
+const SENTINEL_MAC_HEAD_REGEX = /^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}/;
+const NUMERIC_VALUE_REGEX = /^-?\d+(?:\.\d+)?$/;
+
+const MESH_GUARD_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<type>MESH_SPOOF_SELF|MESH_FLOOD|MESH_CMD_INJECT):(?<rest>.*)$/i;
+const MESH_COORD_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<type>TOF_PING|TOF_PONG|BLOOM|IDHASH|CHAN_ASSIGN):(?<rest>.*)$/i;
+const DEVICE_DISAPPEARED_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*DEVICE_DISAPPEARED:\s*(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+absent:(?<absent>\d+)s/i;
+const RID_RX_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*RID_RX:(?<uavId>[^:]+):(?<rssi>-?\d+):(?<lat>-?\d+(?:\.\d+)?):(?<lon>-?\d+(?:\.\d+)?):(?<gpsValid>\d+)/i;
+const RID_CLAIM_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*RID_CLAIM:(?<uavId>[^:]+):(?<lat>-?\d+(?:\.\d+)?):(?<lon>-?\d+(?:\.\d+)?):(?<alt>-?\d+(?:\.\d+)?)/i;
+
+const SENTINEL_ACK_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*SENTINEL_ACK:(?<state>ON|OFF)(?:\s+run=(?<run>\d))?/i;
+const SENTINEL_STATUS_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*SENTINEL_STATUS:\s*en=(?<enabled>\d)\s+run=(?<running>\d)/i;
+const SENTINEL_MODE_ACK_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*SENTINEL_MODE_ACK:(?<mode>scan|defend|FAIL)/i;
+const SENTINEL_BOOT_ACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*SENTINEL_BOOT_ACK:(?<state>on|off)/i;
+const GROUP_ACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*GROUP_ACK:(?<status>OK|FAIL):(?<rest>.+)$/i;
+const DETECT_CFG_ACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*DETECT_CFG_ACK:(?<status>OK|FAIL)/i;
+const DETECT_CFG_LEN_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*DETECT_CFG_LEN:(?<len>\d+)/i;
+const INCIDENTS_LEN_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*INCIDENTS_LEN:(?<len>\d+)/i;
+const INCIDENTS_CLEAR_ACK_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*INCIDENTS_CLEAR_ACK:(?<status>[A-Z_]+)/i;
+const DEDUP_CLEAR_ACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*DEDUP_CLEAR_ACK:(?<status>[A-Z_]+)/i;
+const FACTORY_RESET_ACK_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*FACTORY_RESET_ACK:(?<status>.+)$/i;
+
 const NODE_ID_FALLBACK = /^([A-Za-z0-9_.:-]+)/;
 
 export class MeshtasticRewriteParser implements SerialProtocolParser {
@@ -148,12 +232,17 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
       this.parseProbeHit(payload, sourceId, sanitized) ||
       this.parseAnomaly(payload, sourceId, sanitized) ||
       this.parseAttack(payload, sourceId, sanitized) ||
+      this.parseSentinelDetection(payload, sourceId, sanitized) ||
+      this.parseMeshGuard(payload, sourceId, sanitized) ||
+      this.parseNodeEvents(payload, sourceId, sanitized) ||
+      this.parseMeshCoordination(payload, sourceId, sanitized) ||
       this.parseRandomization(payload, sourceId, sanitized) ||
       this.parseDoneSummary(payload, sourceId, sanitized) ||
       this.parseVibration(payload, sourceId, sanitized) ||
       this.parseTamper(payload, sourceId, sanitized) ||
       this.parseCodes(payload, sourceId, sanitized) ||
       this.parseTriangulationMeta(payload, sourceId, sanitized) ||
+      this.parseSentinelAck(payload, sourceId, sanitized) ||
       this.parseStatus(payload, sourceId, sanitized) ||
       this.parseTimeSync(payload, sourceId, sanitized) ||
       this.parseStartupGpsHeartbeat(payload, sourceId, sanitized) ||
@@ -403,6 +492,331 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
             rssi: Number(short.groups.rssi),
             channel: Number(short.groups.chan),
           },
+          raw,
+        },
+      ];
+    }
+    return null;
+  }
+
+  private parseSentinelDetection(
+    payload: string,
+    nodeId: string | undefined,
+    raw: string,
+  ): SerialParseResult[] | null {
+    const m = SENTINEL_DETECTION_REGEX.exec(payload);
+    if (!m?.groups) return null;
+    const type = m.groups.type.toUpperCase();
+    const schema = SENTINEL_FIELD_SCHEMAS[type] ?? [];
+    const data: Record<string, string | number> = { detectionType: type };
+    let remaining = m.groups.rest ?? '';
+    for (let i = 0; i < schema.length && remaining.length > 0; i += 1) {
+      const field = schema[i];
+      const isLast = i === schema.length - 1;
+      let token: string;
+      if (isLast) {
+        token = remaining;
+        remaining = '';
+      } else if (SENTINEL_MAC_FIELDS.has(field)) {
+        const macHead = SENTINEL_MAC_HEAD_REGEX.exec(remaining);
+        token = macHead ? macHead[0] : this.headToken(remaining);
+        remaining = remaining.slice(token.length).replace(/^:/, '');
+      } else {
+        token = this.headToken(remaining);
+        remaining = remaining.slice(token.length).replace(/^:/, '');
+      }
+      const eq = /^[A-Za-z_]+=(.*)$/.exec(token);
+      const value = eq ? eq[1] : token;
+      if (SENTINEL_MAC_FIELDS.has(field)) {
+        data[field] = value.toUpperCase();
+      } else if (!SENTINEL_STRING_FIELDS.has(field) && NUMERIC_VALUE_REGEX.test(value)) {
+        data[field] = Number(value);
+      } else {
+        data[field] = value;
+      }
+    }
+    return [
+      {
+        kind: 'alert',
+        level: SENTINEL_NOTICE_TYPES.has(type) ? 'NOTICE' : 'ALERT',
+        category: 'sentinel',
+        nodeId: nodeId ?? m.groups.id,
+        message: payload,
+        data,
+        raw,
+      },
+    ];
+  }
+
+  private headToken(value: string): string {
+    const idx = value.indexOf(':');
+    return idx >= 0 ? value.slice(0, idx) : value;
+  }
+
+  private parseMeshGuard(
+    payload: string,
+    nodeId: string | undefined,
+    raw: string,
+  ): SerialParseResult[] | null {
+    const m = MESH_GUARD_REGEX.exec(payload);
+    if (!m?.groups) return null;
+    return [
+      {
+        kind: 'alert',
+        level: 'ALERT',
+        category: 'mesh-guard',
+        nodeId: nodeId ?? m.groups.id,
+        message: payload,
+        data: { intrusionType: m.groups.type.toUpperCase(), detail: m.groups.rest },
+        raw,
+      },
+    ];
+  }
+
+  private parseMeshCoordination(
+    payload: string,
+    nodeId: string | undefined,
+    raw: string,
+  ): SerialParseResult[] | null {
+    const m = MESH_COORD_REGEX.exec(payload);
+    if (!m?.groups) return null;
+    return [
+      {
+        kind: 'alert',
+        level: 'INFO',
+        category: 'mesh-coordination',
+        nodeId: nodeId ?? m.groups.id,
+        message: payload,
+        data: { coordinationType: m.groups.type.toUpperCase(), detail: m.groups.rest },
+        raw,
+      },
+    ];
+  }
+
+  private parseNodeEvents(
+    payload: string,
+    nodeId: string | undefined,
+    raw: string,
+  ): SerialParseResult[] | null {
+    const disappeared = DEVICE_DISAPPEARED_REGEX.exec(payload);
+    if (disappeared?.groups) {
+      return [
+        {
+          kind: 'alert',
+          level: 'NOTICE',
+          category: 'baseline',
+          nodeId: nodeId ?? disappeared.groups.id,
+          message: payload,
+          data: {
+            event: 'device-disappeared',
+            mac: disappeared.groups.mac.toUpperCase(),
+            absentSeconds: Number(disappeared.groups.absent),
+          },
+          raw,
+        },
+      ];
+    }
+    const ridRx = RID_RX_REGEX.exec(payload);
+    if (ridRx?.groups) {
+      return [
+        {
+          kind: 'alert',
+          level: 'NOTICE',
+          category: 'drone',
+          nodeId: nodeId ?? ridRx.groups.id,
+          message: payload,
+          data: {
+            event: 'remote-id-rx',
+            uavId: ridRx.groups.uavId,
+            rssi: Number(ridRx.groups.rssi),
+            lat: Number(ridRx.groups.lat),
+            lon: Number(ridRx.groups.lon),
+            gpsValid: ridRx.groups.gpsValid === '1',
+          },
+          raw,
+        },
+      ];
+    }
+    const ridClaim = RID_CLAIM_REGEX.exec(payload);
+    if (ridClaim?.groups) {
+      return [
+        {
+          kind: 'alert',
+          level: 'NOTICE',
+          category: 'drone',
+          nodeId: nodeId ?? ridClaim.groups.id,
+          message: payload,
+          data: {
+            event: 'remote-id-claim',
+            uavId: ridClaim.groups.uavId,
+            lat: Number(ridClaim.groups.lat),
+            lon: Number(ridClaim.groups.lon),
+            alt: Number(ridClaim.groups.alt),
+          },
+          raw,
+        },
+      ];
+    }
+    return null;
+  }
+
+  private parseSentinelAck(
+    payload: string,
+    nodeId: string | undefined,
+    raw: string,
+  ): SerialParseResult[] | null {
+    const sentinel = SENTINEL_ACK_REGEX.exec(payload);
+    if (sentinel?.groups) {
+      const id = nodeId ?? sentinel.groups.id;
+      const on = sentinel.groups.state.toUpperCase() === 'ON';
+      return [
+        {
+          kind: 'command-ack',
+          nodeId: id,
+          ackType: on ? 'SENTINEL_ON_ACK' : 'SENTINEL_OFF_ACK',
+          status: on ? `ON${sentinel.groups.run ? ` run=${sentinel.groups.run}` : ''}` : 'OFF',
+          raw,
+        },
+        {
+          kind: 'alert',
+          level: 'NOTICE',
+          category: 'sentinel',
+          nodeId: id,
+          message: payload,
+          data: { state: on ? 'on' : 'off', running: sentinel.groups.run === '1' },
+          raw,
+        },
+      ];
+    }
+    const status = SENTINEL_STATUS_REGEX.exec(payload);
+    if (status?.groups) {
+      const id = nodeId ?? status.groups.id;
+      return [
+        {
+          kind: 'command-result',
+          nodeId: id,
+          command: 'SENTINEL_STATUS',
+          payload,
+          raw,
+        },
+        {
+          kind: 'alert',
+          level: 'NOTICE',
+          category: 'sentinel',
+          nodeId: id,
+          message: payload,
+          data: {
+            enabled: status.groups.enabled === '1',
+            running: status.groups.running === '1',
+          },
+          raw,
+        },
+      ];
+    }
+    const mode = SENTINEL_MODE_ACK_REGEX.exec(payload);
+    if (mode?.groups) {
+      return [
+        {
+          kind: 'command-ack',
+          nodeId: nodeId ?? mode.groups.id,
+          ackType: 'SENTINEL_MODE_ACK',
+          status: mode.groups.mode,
+          raw,
+        },
+      ];
+    }
+    const boot = SENTINEL_BOOT_ACK_REGEX.exec(payload);
+    if (boot?.groups) {
+      return [
+        {
+          kind: 'command-ack',
+          nodeId: nodeId ?? boot.groups.id,
+          ackType: 'SENTINEL_BOOT_ACK',
+          status: boot.groups.state,
+          raw,
+        },
+      ];
+    }
+    const group = GROUP_ACK_REGEX.exec(payload);
+    if (group?.groups) {
+      return [
+        {
+          kind: 'command-ack',
+          nodeId: nodeId ?? group.groups.id,
+          ackType: 'GROUP_ACK',
+          status: `${group.groups.status}:${group.groups.rest}`,
+          raw,
+        },
+      ];
+    }
+    const detectCfg = DETECT_CFG_ACK_REGEX.exec(payload);
+    if (detectCfg?.groups) {
+      return [
+        {
+          kind: 'command-ack',
+          nodeId: nodeId ?? detectCfg.groups.id,
+          ackType: 'DETECT_CFG_ACK',
+          status: detectCfg.groups.status,
+          raw,
+        },
+      ];
+    }
+    const detectCfgLen = DETECT_CFG_LEN_REGEX.exec(payload);
+    if (detectCfgLen?.groups) {
+      return [
+        {
+          kind: 'command-result',
+          nodeId: nodeId ?? detectCfgLen.groups.id,
+          command: 'DETECT_CFG_GET',
+          payload,
+          raw,
+        },
+      ];
+    }
+    const incidentsLen = INCIDENTS_LEN_REGEX.exec(payload);
+    if (incidentsLen?.groups) {
+      return [
+        {
+          kind: 'command-result',
+          nodeId: nodeId ?? incidentsLen.groups.id,
+          command: 'INCIDENTS',
+          payload,
+          raw,
+        },
+      ];
+    }
+    const incidentsClear = INCIDENTS_CLEAR_ACK_REGEX.exec(payload);
+    if (incidentsClear?.groups) {
+      return [
+        {
+          kind: 'command-ack',
+          nodeId: nodeId ?? incidentsClear.groups.id,
+          ackType: 'INCIDENTS_CLEAR_ACK',
+          status: incidentsClear.groups.status,
+          raw,
+        },
+      ];
+    }
+    const dedupClear = DEDUP_CLEAR_ACK_REGEX.exec(payload);
+    if (dedupClear?.groups) {
+      return [
+        {
+          kind: 'command-ack',
+          nodeId: nodeId ?? dedupClear.groups.id,
+          ackType: 'DEDUP_CLEAR_ACK',
+          status: dedupClear.groups.status,
+          raw,
+        },
+      ];
+    }
+    const factoryReset = FACTORY_RESET_ACK_REGEX.exec(payload);
+    if (factoryReset?.groups) {
+      return [
+        {
+          kind: 'command-ack',
+          nodeId: nodeId ?? factoryReset.groups.id,
+          ackType: 'FACTORY_RESET_ACK',
+          status: factoryReset.groups.status.trim(),
           raw,
         },
       ];

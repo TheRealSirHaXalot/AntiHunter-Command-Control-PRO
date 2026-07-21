@@ -54,7 +54,11 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       }
     });
 
-    await Promise.all(
+    // Broker connections are established in the background: an unreachable
+    // broker must not hold up application bootstrap (Nest only starts the HTTP
+    // listener once every onModuleInit resolves). Listeners registered later
+    // are replayed by onClientConnected, so nothing depends on this finishing.
+    void Promise.all(
       configs
         .filter((config) => config.enabled)
         .map(async (config) => {

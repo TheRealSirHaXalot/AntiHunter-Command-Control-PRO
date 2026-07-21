@@ -6,6 +6,7 @@ import {
   MdNotificationsActive,
   MdRadar,
   MdSettingsInputAntenna,
+  MdShield,
 } from 'react-icons/md';
 
 import { apiClient } from '../api/client';
@@ -23,6 +24,7 @@ export function AddonPage() {
   const [chatEnabled, setChatEnabled] = useState<boolean>(addonPrefs.chat ?? false);
   const [adsbEnabled, setAdsbEnabled] = useState<boolean>(addonPrefs.adsb ?? false);
   const [acarsEnabled, setAcarsEnabled] = useState<boolean>(addonPrefs.acars ?? false);
+  const [sentinelEnabled, setSentinelEnabled] = useState<boolean>(addonPrefs.sentinel ?? false);
 
   useEffect(() => {
     setStrategyEnabled(addonPrefs.strategy ?? false);
@@ -31,6 +33,7 @@ export function AddonPage() {
     setChatEnabled(addonPrefs.chat ?? false);
     setAdsbEnabled(addonPrefs.adsb ?? false);
     setAcarsEnabled(addonPrefs.acars ?? false);
+    setSentinelEnabled(addonPrefs.sentinel ?? false);
   }, [
     addonPrefs.alerts,
     addonPrefs.chat,
@@ -38,6 +41,7 @@ export function AddonPage() {
     addonPrefs.strategy,
     addonPrefs.adsb,
     addonPrefs.acars,
+    addonPrefs.sentinel,
   ]);
 
   const updateAddons = async (next: Partial<Record<string, boolean>>) => {
@@ -51,6 +55,7 @@ export function AddonPage() {
       setChatEnabled(updated.preferences?.notifications?.addons?.chat ?? false);
       setAdsbEnabled(updated.preferences?.notifications?.addons?.adsb ?? false);
       setAcarsEnabled(updated.preferences?.notifications?.addons?.acars ?? false);
+      setSentinelEnabled(updated.preferences?.notifications?.addons?.sentinel ?? false);
     } catch (error) {
       console.error('Failed to update add-ons', error);
     }
@@ -62,6 +67,7 @@ export function AddonPage() {
   const handleChatToggle = () => updateAddons({ chat: !chatEnabled });
   const handleAdsbToggle = () => updateAddons({ adsb: !adsbEnabled });
   const handleAcarsToggle = () => updateAddons({ acars: !acarsEnabled });
+  const handleSentinelToggle = () => updateAddons({ sentinel: !sentinelEnabled });
 
   return (
     <div className="page addon-page">
@@ -70,6 +76,29 @@ export function AddonPage() {
         <p className="form-hint">Extend Command Center with experimental capabilities.</p>
       </header>
       <div className="addon-grid">
+        <article className="config-card addon-card">
+          <div className="addon-card__logo">
+            <MdShield size={42} />
+          </div>
+          <h2>Sentinel</h2>
+          <div className="addon-card__body">
+            <p>
+              Control the WiFi attacker-tool detectors on your nodes and monitor live attack
+              detections streaming in over mesh.
+            </p>
+            <div className="addon-card__notice">This addon is under development.</div>
+            <p className="form-hint">
+              Adds a Sentinel tab with detector controls and a live detection feed; visible in the
+              main navigation when enabled.
+            </p>
+          </div>
+          <div className="addon-card__actions">
+            <button type="button" className="control-chip" onClick={handleSentinelToggle}>
+              {sentinelEnabled ? 'Deactivate add-on' : 'Activate add-on'}
+            </button>
+          </div>
+        </article>
+
         <article className="config-card addon-card">
           <div className="addon-card__logo">
             <MdHub size={42} />

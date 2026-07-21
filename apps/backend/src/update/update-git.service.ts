@@ -256,7 +256,7 @@ export class UpdateGitService {
     author: string;
   }> {
     try {
-      const result = await this.execGit(['show', '-s', '--format=%H%n%s%n%ci%n%an', commitHash]);
+      const result = await this.execGit(['show', '-s', '--format=%H%n%s%n%cI%n%an', commitHash]);
 
       const lines = result.stdout.split('\n');
       return {
@@ -546,7 +546,7 @@ export class UpdateGitService {
       const result = await this.execGit([
         'log',
         `${fromRef}..${toRef}`,
-        '--format=%H%n%s%n%ci%n%an%n---',
+        '--format=%H%n%s%n%cI%n%an%n---',
         `-n${limit}`,
       ]);
 
@@ -599,6 +599,77 @@ export class UpdateGitService {
       const err = error as Error;
       this.logger.error(`Failed to get remote URL: ${err.message}`);
       throw error;
+    }
+  }
+
+  /**
+   * List configured remotes with their URLs
+   */
+  async listRemotes(): Promise<Array<{ name: string; url: string }>> {
+    try {
+      const result = await this.execGit(['remote']);
+      if (result.exitCode !== 0) {
+        throw new Error(`Git remote failed: ${result.stderr}`);
+      }
+
+      const names = result.stdout
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => /^[A-Za-z0-9._-]+$/.test(line));
+
+      const remotes: Array<{ name: string; url: string }> = [];
+      for (const name of names) {
+        const url = await this.getRemoteUrl(name).catch(() => '');
+        remotes.push({ name, url });
+      }
+
+      return remotes;
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Failed to list remotes: ${err.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * List remote-tracking branches for a remote (as fetched locally)
+   */
+  async listRemoteBranches(remote: string): Promise<string[]> {
+    try {
+      const result = await this.execGit([
+        'for-each-ref',
+        '--format=%(refname:short)',
+        `refs/remotes/${remote}`,
+      ]);
+
+      if (result.exitCode !== 0) {
+        throw new Error(`Git for-each-ref failed: ${result.stderr}`);
+      }
+
+      const prefix = `${remote}/`;
+      return result.stdout
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.startsWith(prefix))
+        .map((line) => line.slice(prefix.length))
+        .filter((branch) => branch && branch !== 'HEAD')
+        .sort();
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Failed to list remote branches: ${err.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * Check whether a remote-tracking ref exists locally
+   */
+  async remoteBranchExists(remote: string, branch: string): Promise<boolean> {
+    try {
+      const result = await this.execGit(['rev-parse', '--verify', `${remote}/${branch}`]);
+      return result.exitCode === 0;
+    } catch (error: unknown) {
+      return false;
     }
   }
 

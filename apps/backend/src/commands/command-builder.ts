@@ -6,6 +6,21 @@ const ERASE_TOKEN_PATTERN = /^AH_[0-9]{8}_[0-9]{8}_[0-9]{8}$/;
 const TRIANGULATE_IDENTITY_PATTERN = /^T-[A-Za-z0-9_-]+$/;
 const CUSTOM_NODE_ID_PATTERN = /^[A-Z0-9]{2,6}$/;
 
+const SENTINEL_MODES = new Set(['scan', 'defend']);
+const SENTINEL_BOOT_STATES = new Set(['on', 'off', '1', '0', 'true', 'false']);
+const GROUP_NAMES = new Set([
+  'dos',
+  'rogue',
+  'rogue_ap',
+  'recon',
+  'physical',
+  'phys',
+  'mesh',
+  'all',
+]);
+const GROUP_STATES = new Set(['on', 'off', '1', '0', 'true', 'false']);
+const FACTORY_RESET_TIERS = new Set(['FULL', 'CONFIG', 'DATA']);
+
 export type CommandBuildInput = {
   target: string;
   name: string;
@@ -55,9 +70,24 @@ const COMMAND_HANDLERS = new Map<string, CommandHandler>([
   ['BATTERY_SAVER_START', handleBatterySaverStart],
   ['BATTERY_SAVER_STOP', expectNoParams],
   ['BATTERY_SAVER_STATUS', expectNoParams],
+  ['SENTINEL_ON', expectNoParams],
+  ['SENTINEL_OFF', expectNoParams],
+  ['SENTINEL_STATUS', expectNoParams],
+  ['SENTINEL_MODE', handleSentinelMode],
+  ['SENTINEL_BOOT', handleSentinelBoot],
+  ['GROUP', handleGroup],
+  ['DETECT_CFG', handleDetectCfg],
+  ['DETECT_CFG_GET', expectNoParams],
+  ['INCIDENTS', handleIncidents],
+  ['INCIDENTS_CLEAR', expectNoParams],
+  ['CONFIG_ERASE_PSK', handleConfigErasePsk],
+  ['CONFIG_DEDUP_TTL', handleConfigDedupTtl],
+  ['CONFIG_SESSION_DEDUP', handleConfigSessionDedup],
+  ['MESH_DEDUP_CLEAR', expectNoParams],
+  ['FACTORY_RESET', handleFactoryReset],
 ]);
 
-const SINGLE_NODE_COMMANDS = new Set<string>(['CONFIG_NODEID']);
+const SINGLE_NODE_COMMANDS = new Set<string>(['CONFIG_NODEID', 'FACTORY_RESET']);
 
 export function buildCommandPayload(input: CommandBuildInput): CommandBuildOutput {
   const target = normalizeTarget(input.target);
@@ -466,6 +496,127 @@ function handleBatterySaverStart(params: string[]): string[] {
     throw new BadRequestException('Heartbeat interval must be between 1 and 1440 minutes.');
   }
   return [interval.toString()];
+}
+
+function handleSentinelMode(params: string[]): string[] {
+  if (params.length !== 1) {
+    throw new BadRequestException('SENTINEL_MODE expects a single mode value (scan or defend).');
+  }
+  const mode = params[0].trim().toLowerCase();
+  if (!SENTINEL_MODES.has(mode)) {
+    throw new BadRequestException('SENTINEL_MODE must be scan or defend.');
+  }
+  return [mode];
+}
+
+function handleSentinelBoot(params: string[]): string[] {
+  if (params.length !== 1) {
+    throw new BadRequestException('SENTINEL_BOOT expects a single value (on or off).');
+  }
+  const value = params[0].trim().toLowerCase();
+  if (!SENTINEL_BOOT_STATES.has(value)) {
+    throw new BadRequestException('SENTINEL_BOOT must be on or off.');
+  }
+  return [
+    value === '1' || value === 'true' ? 'on' : value === '0' || value === 'false' ? 'off' : value,
+  ];
+}
+
+function handleGroup(params: string[]): string[] {
+  if (params.length !== 2) {
+    throw new BadRequestException('GROUP expects a group name and a state (on or off).');
+  }
+  const name = params[0].trim().toLowerCase();
+  if (!GROUP_NAMES.has(name)) {
+    throw new BadRequestException(
+      `Invalid group name: ${params[0]}. Expected one of dos, rogue, recon, physical, mesh, all.`,
+    );
+  }
+  const state = params[1].trim().toLowerCase();
+  if (!GROUP_STATES.has(state)) {
+    throw new BadRequestException('GROUP state must be on or off.');
+  }
+  return [name, state];
+}
+
+function handleDetectCfg(params: string[]): string[] {
+  if (params.length !== 1) {
+    throw new BadRequestException('DETECT_CFG expects a single JSON configuration string.');
+  }
+  const json = params[0].trim();
+  if (json.length > 180) {
+    throw new BadRequestException('DETECT_CFG payload must be 180 characters or fewer.');
+  }
+  try {
+    JSON.parse(json);
+  } catch {
+    throw new BadRequestException('DETECT_CFG payload must be valid JSON.');
+  }
+  return [json];
+}
+
+function handleIncidents(params: string[]): string[] {
+  if (params.length === 0) {
+    return [];
+  }
+  if (params.length !== 1) {
+    throw new BadRequestException('INCIDENTS expects an optional count (1-200).');
+  }
+  const count = Number.parseInt(params[0].trim(), 10);
+  if (!Number.isFinite(count) || count < 1 || count > 200) {
+    throw new BadRequestException('INCIDENTS count must be between 1 and 200.');
+  }
+  return [count.toString()];
+}
+
+function handleConfigErasePsk(params: string[]): string[] {
+  if (params.length !== 1) {
+    throw new BadRequestException('CONFIG_ERASE_PSK expects a single pre-shared key.');
+  }
+  const key = params[0].trim();
+  if (key.length < 1 || key.length > 64) {
+    throw new BadRequestException('Erase PSK must be between 1 and 64 characters.');
+  }
+  return [key];
+}
+
+function handleConfigDedupTtl(params: string[]): string[] {
+  if (params.length !== 1) {
+    throw new BadRequestException('CONFIG_DEDUP_TTL expects a single TTL value in seconds.');
+  }
+  const ttl = Number.parseInt(params[0].trim(), 10);
+  if (!Number.isFinite(ttl) || ttl < 0 || ttl > 3600) {
+    throw new BadRequestException('Dedup TTL must be between 0 and 3600 seconds.');
+  }
+  return [ttl.toString()];
+}
+
+function handleConfigSessionDedup(params: string[]): string[] {
+  if (params.length !== 1) {
+    throw new BadRequestException('CONFIG_SESSION_DEDUP expects 0 or 1.');
+  }
+  const value = params[0].trim();
+  if (value !== '0' && value !== '1') {
+    throw new BadRequestException('CONFIG_SESSION_DEDUP must be 0 or 1.');
+  }
+  return [value];
+}
+
+function handleFactoryReset(params: string[]): string[] {
+  if (params.length !== 2) {
+    throw new BadRequestException(
+      'FACTORY_RESET expects a tier (FULL, CONFIG, or DATA) and a credential.',
+    );
+  }
+  const tier = params[0].trim().toUpperCase();
+  if (!FACTORY_RESET_TIERS.has(tier)) {
+    throw new BadRequestException('FACTORY_RESET tier must be FULL, CONFIG, or DATA.');
+  }
+  const credential = params[1].trim();
+  if (credential.length < 1) {
+    throw new BadRequestException('FACTORY_RESET requires a credential.');
+  }
+  return [tier, credential];
 }
 
 function normalizeTargetReference(value: string): string {

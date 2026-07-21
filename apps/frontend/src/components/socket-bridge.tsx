@@ -13,6 +13,7 @@ import type {
   AdsbTrack,
   AcarsMessage,
 } from '../api/types';
+import { sentinelDetectionLabel } from '../data/sentinel';
 import { useAlarm } from '../providers/alarm-provider';
 import { useSocket } from '../providers/socket-provider';
 import { useAdsbStore } from '../stores/adsb-store';
@@ -26,6 +27,7 @@ import type { GeofenceEvent } from '../stores/geofence-store';
 import { useMapPreferences } from '../stores/map-store';
 import { canonicalNodeId, NodeDiffPayload, NodeSummary, useNodeStore } from '../stores/node-store';
 import { useProbeStore } from '../stores/probe-store';
+import { useSentinelStore } from '../stores/sentinel-store';
 import { TerminalEntry, TerminalLevel, useTerminalStore } from '../stores/terminal-store';
 import { useTrackingBannerStore } from '../stores/tracking-banner-store';
 import { useTrackingSessionStore } from '../stores/tracking-session-store';
@@ -503,7 +505,9 @@ export function SocketBridge() {
           void queryClient.invalidateQueries({ queryKey: ['targets'] });
         },
       });
-      addEntry(entry);
+      if (entry) {
+        addEntry(entry);
+      }
       const alarmLevel = extractAlarmLevel(payload);
       if (alarmLevel) {
         const playbackLevel: AlarmLevel = alarmLevel === 'CRITICAL' ? 'ALERT' : alarmLevel;
@@ -635,6 +639,15 @@ export function SocketBridge() {
           lon: alertDetails.lon,
           timestamp: alertDetails.timestamp,
         });
+      }
+
+      const sentinelEvent = extractSentinelEvent(payload);
+      if (sentinelEvent) {
+        if (sentinelEvent.kind === 'status') {
+          useSentinelStore.getState().setStatus(sentinelEvent.status);
+        } else {
+          useSentinelStore.getState().addDetection(sentinelEvent.detection);
+        }
       }
     };
 
@@ -844,7 +857,7 @@ function normalizeDroneStatus(value: unknown): DroneStatus {
 function parseEventPayload(
   payload: unknown,
   options?: { onTriangulationComplete?: () => void },
-): TerminalEntryInput {
+): TerminalEntryInput | null {
   if (typeof payload === 'string') {
     return { message: payload, level: 'info', source: 'ws' };
   }
@@ -866,6 +879,10 @@ function parseEventPayload(
     if (base.type === 'event.alert') {
       const levelRaw = typeof base.level === 'string' ? base.level.toUpperCase() : undefined;
       const category = typeof base.category === 'string' ? base.category.toLowerCase() : undefined;
+
+      if (category === 'mesh-coordination') {
+        return null;
+      }
 
       const baseMessage = base.message ?? `Alert from ${base.nodeId ?? 'unknown node'}`;
       const messageUpper = baseMessage.toUpperCase();
@@ -1304,6 +1321,117 @@ function extractAlertDetails(payload: unknown): AlertDetails | null {
     lat: toNumber(base.lat ?? (data as Record<string, unknown>).lat),
     lon: toNumber(base.lon ?? (data as Record<string, unknown>).lon),
     timestamp: typeof base.timestamp === 'string' ? base.timestamp : undefined,
+  };
+}
+
+type SentinelEventResult =
+  | {
+      kind: 'detection';
+      detection: {
+        id: string;
+        nodeId: string;
+        siteId?: string;
+        category: string;
+        level: string;
+        detectionType: string;
+        label: string;
+        mac?: string;
+        rssi?: number;
+        message: string;
+        data: Record<string, unknown>;
+        timestamp: string;
+      };
+    }
+  | {
+      kind: 'status';
+      status: {
+        nodeId: string;
+        siteId?: string;
+        enabled?: boolean;
+        running?: boolean;
+        timestamp: string;
+      };
+    };
+
+function extractSentinelEvent(payload: unknown): SentinelEventResult | null {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+  const base = payload as {
+    type?: string;
+    category?: string;
+    nodeId?: string;
+    siteId?: string;
+    level?: string;
+    message?: string;
+    timestamp?: string;
+    data?: Record<string, unknown>;
+  };
+  if (base.type !== 'event.alert' || !base.nodeId) {
+    return null;
+  }
+  const category = typeof base.category === 'string' ? base.category.toLowerCase() : '';
+  if (category !== 'sentinel' && category !== 'mesh-guard') {
+    return null;
+  }
+  const data = base.data ?? {};
+  const timestamp = typeof base.timestamp === 'string' ? base.timestamp : new Date().toISOString();
+  const message = typeof base.message === 'string' ? base.message : '';
+
+  if (
+    category === 'sentinel' &&
+    typeof data.detectionType === 'undefined' &&
+    ('enabled' in data || 'running' in data || 'state' in data)
+  ) {
+    const enabled =
+      typeof data.enabled === 'boolean'
+        ? data.enabled
+        : typeof data.state === 'string'
+          ? data.state.toLowerCase() === 'on'
+          : undefined;
+    return {
+      kind: 'status',
+      status: {
+        nodeId: base.nodeId,
+        siteId: base.siteId,
+        enabled,
+        running: typeof data.running === 'boolean' ? data.running : undefined,
+        timestamp,
+      },
+    };
+  }
+
+  const detectionType =
+    category === 'mesh-guard'
+      ? typeof data.intrusionType === 'string'
+        ? data.intrusionType
+        : 'MESH_GUARD'
+      : typeof data.detectionType === 'string'
+        ? data.detectionType
+        : 'SENTINEL';
+  const mac = [data.mac, data.bssid, data.src].find((value) => typeof value === 'string') as
+    | string
+    | undefined;
+  const id =
+    typeof window !== 'undefined' && window.crypto?.randomUUID
+      ? window.crypto.randomUUID()
+      : `${base.nodeId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return {
+    kind: 'detection',
+    detection: {
+      id,
+      nodeId: base.nodeId,
+      siteId: base.siteId,
+      category,
+      level: base.level ?? 'ALERT',
+      detectionType,
+      label: sentinelDetectionLabel(detectionType),
+      mac,
+      rssi: typeof data.rssi === 'number' ? data.rssi : undefined,
+      message,
+      data,
+      timestamp,
+    },
   };
 }
 

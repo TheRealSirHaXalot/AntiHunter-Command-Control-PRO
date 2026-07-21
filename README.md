@@ -109,6 +109,15 @@ AntiHunter Command & Control PRO turns raw radio/mesh telemetry into actionable 
 - **Secure runtime**: webhook dispatchers let you disable TLS validation for lab setups or enforce full-chain verification in production. Client certificates and private keys are stored encrypted in the database, and Prisma migrations now cover inventory update events plus serial/raw tap targets.
 - **Operator UX**: the Alerts, Config, and Addons pages now share the same shell (sidebar buttons outside the card, stacked sections within) so the experience is consistent no matter which subsystem you configure.
 
+### Sentinel Command Console & Attack Telemetry
+
+- **Sentinel lifecycle commands**: the Console can arm/disarm the passive WiFi attack detector per node with `SENTINEL_ON` / `SENTINEL_OFF`, pull its live state with `SENTINEL_STATUS`, switch between `SENTINEL_MODE:scan` (channel-hopping) and `SENTINEL_MODE:defend` (AP-channel pinned), and persist auto-start across reboots with `SENTINEL_BOOT:on` / `SENTINEL_BOOT:off`.
+- **Detector groups & tuning**: `GROUP:<name>:<on|off>` enables or disables a whole detector family per node (`dos`, `rogue`, `recon`, `physical`, `mesh`, or `all`); `DETECT_CFG:<json>` pushes tunable detector thresholds (JSON, ≤180 chars) and `DETECT_CFG_GET` reads the node's active configuration back over mesh.
+- **Incident log**: `INCIDENTS[:<count>]` (count 1-200) requests the node's Sentinel incident ring buffer over mesh; `INCIDENTS_CLEAR` wipes it.
+- **Mesh de-dup controls**: `CONFIG_DEDUP_TTL:<0-3600>` sets the cross-scan MAC de-dup TTL (seconds), `CONFIG_SESSION_DEDUP:<0|1>` toggles per-session de-dup, and `MESH_DEDUP_CLEAR` flushes the de-dup cache.
+- **Erase authorization**: `CONFIG_ERASE_PSK:<key>` (1-64 chars) sets the pre-shared key that gates erase/factory-reset commands, and `FACTORY_RESET:<FULL|CONFIG|DATA>:<credential>` factory-resets a single targeted node against that credential.
+- **Attack telemetry ingest**: the backend now parses Sentinel WiFi attack detections (`<nodeId>: <TYPE>:<fields>`) covering rogue-AP attacks (evil-twin, OWE-downgrade abuse, karma/MANA candidate + confirmed), credential-harvesting activity (PMKID forge/harvest, EAPOL bait, handshake capture, KRACK), flood/DoS activity (deauth flood/forge/AP-targeted, beacon flood/forge, auth flood, assoc-sleep, SAE DoS, probe floods and their behavioral/AP-targeted variants), recon and physical-layer abuse (SSID confusion, FragAttacks, generic recon, attacker-hunt, PHY jamming), and Pwnagotchi beacon fingerprints -- plus mesh-guard intrusion alerts (self-spoof, mesh flood, command injection), baseline `DEVICE_DISAPPEARED` events, and RemoteID relay frames (`RID_RX`, `RID_CLAIM`). These feed the same Console/Alerts/map pipeline as existing detection types.
+
 ### UI Modules at a Glance
 
 Each primary view ships with rich operator context.

@@ -28,14 +28,42 @@ export interface UpdateInfo {
   currentCommit: string;
   currentBranch?: string;
   remote?: string;
+  remoteBranch?: string;
   latestCommit?: string;
   commitsBehind?: number;
+  commitsAhead?: number;
   lastCommitMessage?: string;
   lastCommitDate?: string;
   lastCommitAuthor?: string;
+  localCommitMessage?: string;
+  localCommitDate?: string;
+  localCommitAuthor?: string;
+  remoteCommitMessage?: string;
+  remoteCommitDate?: string;
+  remoteCommitAuthor?: string;
   lastCheckAt: string;
   error?: string;
   warning?: string;
+}
+
+export type DatabaseSchemaState = 'up-to-date' | 'pending' | 'failed' | 'unreachable' | 'unknown';
+
+export interface DatabaseStatus {
+  state: DatabaseSchemaState;
+  message: string;
+  migrationsFound?: number;
+  pendingMigrations: string[];
+  failedMigrations: string[];
+  actionRequired: boolean;
+  appliedDuringUpdate: boolean;
+  manualCommand?: string;
+  details?: string;
+}
+
+export interface GitRemoteInfo {
+  name: string;
+  url: string;
+  isDefault: boolean;
 }
 
 export interface UpdateProgressEvent {

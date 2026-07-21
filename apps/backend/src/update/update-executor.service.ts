@@ -6,6 +6,7 @@ import { UpdateBackupService } from './update-backup.service';
 import { UpdateConfigService } from './update-config.service';
 import { UpdateGitService } from './update-git.service';
 import {
+  DatabaseStatus,
   UpdatePhase,
   UpdateProgressEvent,
   UpdateExecutionResult,
@@ -33,7 +34,7 @@ export class UpdateExecutorService {
   private async execCommand(
     command: string,
     args: string[],
-    options: { timeout?: number; cwd?: string; phase: UpdatePhase } = {
+    options: { timeout?: number; cwd?: string; phase: UpdatePhase; silent?: boolean } = {
       phase: UpdatePhase.PREFLIGHT,
     },
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
@@ -68,7 +69,9 @@ export class UpdateExecutorService {
           return;
         }
         stdout += output;
-        this.publishLogEvent('info', output, options.phase);
+        if (!options.silent) {
+          this.publishLogEvent('info', output, options.phase);
+        }
       });
 
       child.stderr.on('data', (data) => {
@@ -81,7 +84,9 @@ export class UpdateExecutorService {
           return;
         }
         stderr += output;
-        this.publishLogEvent('warn', output, options.phase);
+        if (!options.silent) {
+          this.publishLogEvent('warn', output, options.phase);
+        }
       });
 
       const timeoutId = setTimeout(() => {
@@ -405,6 +410,132 @@ export class UpdateExecutorService {
         error: err.message,
       };
     }
+  }
+
+  /**
+   * Read-only inspection of the database migration state.
+   * Never mutates the database — safe to call outside an update.
+   */
+  async getDatabaseStatus(): Promise<DatabaseStatus> {
+    const manualCommand = 'pnpm --filter @command-center/backend exec prisma migrate deploy';
+
+    let output: string;
+    try {
+      const result = await this.execCommand(
+        'pnpm',
+        ['--filter', '@command-center/backend', 'exec', 'prisma', 'migrate', 'status'],
+        { timeout: 60000, phase: UpdatePhase.DATABASE, silent: true },
+      );
+      output = `${result.stdout}\n${result.stderr}`.trim();
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Failed to read migration status: ${err.message}`);
+      return {
+        state: 'unknown',
+        message: `Could not read migration status: ${err.message}`,
+        pendingMigrations: [],
+        failedMigrations: [],
+        actionRequired: false,
+        appliedDuringUpdate: true,
+        manualCommand,
+      };
+    }
+
+    const foundMatch = /(\d+)\s+migrations?\s+found/i.exec(output);
+    const migrationsFound = foundMatch ? Number(foundMatch[1]) : undefined;
+
+    if (/P1001|P1000|Can't reach database server|Authentication failed/i.test(output)) {
+      return {
+        state: 'unreachable',
+        message: 'Database is unreachable — check DATABASE_URL and that PostgreSQL is running.',
+        migrationsFound,
+        pendingMigrations: [],
+        failedMigrations: [],
+        actionRequired: true,
+        appliedDuringUpdate: false,
+        manualCommand,
+        details: output,
+      };
+    }
+
+    const failedMigrations = this.extractMigrationNames(output, /migrations?\s+have\s+failed/i);
+    if (failedMigrations.length > 0) {
+      return {
+        state: 'failed',
+        message: `${failedMigrations.length} migration(s) failed and must be resolved before deploying.`,
+        migrationsFound,
+        pendingMigrations: [],
+        failedMigrations,
+        actionRequired: true,
+        appliedDuringUpdate: false,
+        manualCommand: `pnpm --filter @command-center/backend exec prisma migrate resolve --rolled-back ${failedMigrations[0]}`,
+        details: output,
+      };
+    }
+
+    const pendingMigrations = this.extractMigrationNames(
+      output,
+      /migrations?\s+have\s+not\s+yet\s+been\s+applied/i,
+    );
+    if (pendingMigrations.length > 0) {
+      return {
+        state: 'pending',
+        message: `${pendingMigrations.length} migration(s) pending — these are applied automatically during a deploy.`,
+        migrationsFound,
+        pendingMigrations,
+        failedMigrations: [],
+        actionRequired: true,
+        appliedDuringUpdate: true,
+        manualCommand,
+        details: output,
+      };
+    }
+
+    if (/up to date/i.test(output)) {
+      return {
+        state: 'up-to-date',
+        message: migrationsFound
+          ? `Database schema is up to date (${migrationsFound} migrations applied).`
+          : 'Database schema is up to date.',
+        migrationsFound,
+        pendingMigrations: [],
+        failedMigrations: [],
+        actionRequired: false,
+        appliedDuringUpdate: true,
+        manualCommand,
+      };
+    }
+
+    return {
+      state: 'unknown',
+      message: 'Could not determine database migration state.',
+      migrationsFound,
+      pendingMigrations: [],
+      failedMigrations: [],
+      actionRequired: false,
+      appliedDuringUpdate: true,
+      manualCommand,
+      details: output,
+    };
+  }
+
+  private extractMigrationNames(output: string, header: RegExp): string[] {
+    const lines = output.split('\n');
+    const headerIndex = lines.findIndex((line) => header.test(line));
+    if (headerIndex === -1) return [];
+
+    const names: string[] = [];
+    for (const line of lines.slice(headerIndex + 1)) {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        if (names.length > 0) break;
+        continue;
+      }
+      if (!/^\d{6,}_[\w-]+$/.test(trimmed)) break;
+      names.push(trimmed);
+    }
+
+    return names;
   }
 
   /**
