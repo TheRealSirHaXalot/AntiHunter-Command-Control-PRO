@@ -158,6 +158,10 @@ Audit node health, connectivity, and telemetry history with quick map focus acti
 
 ![Nodes list with health indicators](images/NodesFilled.png)
 
+#### Sentinel
+
+Arm the WiFi attacker-tool detectors and watch attacks arrive over mesh. Pick a target node (or `@ALL`) and site, start or stop the detector, and query live status. Radio mode switches between scanning all channels and pinning to the AP channel, with an option to auto-start on boot. Detector families (DoS, Rogue AP, Recon, Physical, Mesh Guard) and individual detectors toggle independently, a per-node panel shows which nodes are running, and the detection feed streams hits with per-type filters. Available as an add-on.
+
 #### Scheduler
 
 Plan recurring scans, FOREVER tasks, and automated detection sequences.
@@ -172,7 +176,7 @@ Adjust system defaults (alarms, detection presets, serial ports, site federation
 
 #### Addons
 
-Enable or disable optional modules (Scheduler, Alerts, Strategy Advisor, future analytics packs) to tailor the UI for your deployment. The updated capture shows the Addons catalog card, feature summaries, and the new badge callouts for beta-grade modules.
+Enable or disable optional modules (Sentinel, Scheduler, Alerts, Strategy Advisor, future analytics packs) to tailor the UI for your deployment. The updated capture shows the Addons catalog card, feature summaries, and the new badge callouts for beta-grade modules.
 
 ![Addons management](images/addons.png)
 
