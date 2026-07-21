@@ -158,6 +158,13 @@ Audit node health, connectivity, and telemetry history with quick map focus acti
 
 ![Nodes list with health indicators](images/NodesFilled.png)
 
+#### Sentinel
+
+<img width="1053" height="910" alt="image" src="https://github.com/user-attachments/assets/3dcc3cae-88e0-4e47-8285-4938d73f80b4" />
+
+
+Arm the WiFi attack detection tool. Detector families (DoS, Rogue AP, Recon, Physical, Mesh Guard)
+
 #### Scheduler
 
 Plan recurring scans, FOREVER tasks, and automated detection sequences.
@@ -172,7 +179,7 @@ Adjust system defaults (alarms, detection presets, serial ports, site federation
 
 #### Addons
 
-Enable or disable optional modules (Scheduler, Alerts, Strategy Advisor, future analytics packs) to tailor the UI for your deployment. The updated capture shows the Addons catalog card, feature summaries, and the new badge callouts for beta-grade modules.
+Enable or disable optional modules (Sentinel, Scheduler, Alerts, Strategy Advisor, future analytics packs) to tailor the UI for your deployment. The updated capture shows the Addons catalog card, feature summaries, and the new badge callouts for beta-grade modules.
 
 ![Addons management](images/addons.png)
 
@@ -440,7 +447,7 @@ Follow these steps in order:
    powershell -ExecutionPolicy Bypass -File scripts\setup-windows.ps1
    ```
 
-4. **Answer the prompts.** Press **Enter** to accept the defaults or set your own. The first run takes a few minutes. Mod the .env file to change values later on. When it finishes, **write down the admin email and password you set.**
+4. **Answer the prompts.** Press **Enter** to accept the defaults. The first run takes a few minutes. When it finishes, **write down the admin email and password it shows you.**
 
 5. **Start the app.** Double-click **`Start-AntiHunter.cmd`** in the project folder (or run `pnpm AHCC` in a normal PowerShell window).
 
@@ -453,6 +460,8 @@ To update later, open the app's update page or run `git pull` in the project fol
 
 - **Windows Firewall** may ask to allow Node.js the first time you start the app. Only using it on this PC? Click **Cancel** — `localhost` works regardless. Want to reach it from other devices on your network? Click **Allow**, and tick **Private** only (leave **Public** off).
 - **Serial hardware:** put `SERIAL_DEVICE=COM3` in `apps\backend\.env` (your port from **Device Manager -> Ports (COM & LPT)**), then restart the app.
+- **ARM64 Windows** (VM on Apple Silicon): the x64 builds install automatically — nothing extra to do.
+- **Don't use WSL** — COM ports don't pass through cleanly.
 </details>
 
 ### Docker
