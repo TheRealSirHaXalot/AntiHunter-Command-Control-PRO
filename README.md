@@ -160,7 +160,10 @@ Audit node health, connectivity, and telemetry history with quick map focus acti
 
 #### Sentinel
 
-Arm the WiFi attacker-tool detectors and watch attacks arrive over mesh. Pick a target node (or `@ALL`) and site, start or stop the detector, and query live status. Radio mode switches between scanning all channels and pinning to the AP channel, with an option to auto-start on boot. Detector families (DoS, Rogue AP, Recon, Physical, Mesh Guard) and individual detectors toggle independently, a per-node panel shows which nodes are running, and the detection feed streams hits with per-type filters. Available as an add-on.
+<img width="1053" height="910" alt="image" src="https://github.com/user-attachments/assets/3dcc3cae-88e0-4e47-8285-4938d73f80b4" />
+
+
+Arm the WiFi attack detection tool. Detector families (DoS, Rogue AP, Recon, Physical, Mesh Guard)
 
 #### Scheduler
 
