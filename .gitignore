@@ -55,4 +55,4 @@ apps/backend/data/adsb/adsb-alert-rules.json
 apps/backend/data/acars/config.json
 apps/backend/backups/
 
-apps/frontend/tsconfig.tsbuildinfo
+*.tsbuildinfo
