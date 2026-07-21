@@ -17,6 +17,8 @@ export const SENTINEL_MODES = [
   { value: 'defend', label: 'Defend this AP' },
 ];
 
+export const SENTINEL_DEFAULT_MODE = 'defend';
+
 export interface SentinelDetector {
   key: string;
   label: string;

@@ -86,6 +86,7 @@ export function AddonPage() {
               Control the WiFi attacker-tool detectors on your nodes and monitor live attack
               detections streaming in over mesh.
             </p>
+            <div className="addon-card__notice">This addon is under development.</div>
             <p className="form-hint">
               Adds a Sentinel tab with detector controls and a live detection feed; visible in the
               main navigation when enabled.

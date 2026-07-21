@@ -6,6 +6,7 @@ import {
   Body,
   HttpCode,
   HttpStatus,
+  Query,
   UseGuards,
   Request,
   BadRequestException,
@@ -14,10 +15,10 @@ import {
 import { Role } from '@prisma/client';
 
 import { TriggerUpdateDto } from './dto/trigger-update.dto';
-import { UpdateInfoDto } from './dto/update-info.dto';
+import { GitRemoteDto, UpdateInfoDto } from './dto/update-info.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { UpdateService } from './update.service';
-import { UpdateStatus } from './update.types';
+import { DatabaseStatus, UpdateStatus } from './update.types';
 import { Roles } from '../auth/auth.decorators';
 
 interface AuthenticatedRequest {
@@ -36,9 +37,12 @@ export class UpdateController {
    */
   @Get('check')
   @HttpCode(HttpStatus.OK)
-  async checkForUpdates(): Promise<UpdateInfoDto> {
+  async checkForUpdates(
+    @Query('remote') remote?: string,
+    @Query('branch') branch?: string,
+  ): Promise<UpdateInfoDto> {
     try {
-      const updateInfo = await this.updateService.checkForUpdates();
+      const updateInfo = await this.updateService.checkForUpdates({ remote, branch });
 
       const blockers: string[] = [];
 
@@ -52,11 +56,19 @@ export class UpdateController {
         currentCommit: updateInfo.currentCommit,
         currentBranch: updateInfo.currentBranch,
         remote: updateInfo.remote,
+        remoteBranch: updateInfo.remoteBranch,
         latestCommit: updateInfo.latestCommit,
         commitsBehind: updateInfo.commitsBehind,
+        commitsAhead: updateInfo.commitsAhead,
         lastCommitMessage: updateInfo.lastCommitMessage,
         lastCommitDate: updateInfo.lastCommitDate,
         lastCommitAuthor: updateInfo.lastCommitAuthor,
+        localCommitMessage: updateInfo.localCommitMessage,
+        localCommitDate: updateInfo.localCommitDate,
+        localCommitAuthor: updateInfo.localCommitAuthor,
+        remoteCommitMessage: updateInfo.remoteCommitMessage,
+        remoteCommitDate: updateInfo.remoteCommitDate,
+        remoteCommitAuthor: updateInfo.remoteCommitAuthor,
         lastCheckAt: updateInfo.lastCheckAt,
         canUpdate: updateInfo.available && blockers.length === 0,
         blockers: blockers.length > 0 ? blockers : undefined,
@@ -65,6 +77,52 @@ export class UpdateController {
     } catch (error: unknown) {
       const err = error as Error;
       throw new BadRequestException(`Failed to check for updates: ${err.message}`);
+    }
+  }
+
+  /**
+   * List configured git remotes
+   * GET /api/updates/remotes
+   */
+  @Get('remotes')
+  @HttpCode(HttpStatus.OK)
+  async listRemotes(): Promise<GitRemoteDto[]> {
+    try {
+      return await this.updateService.listRemotes();
+    } catch (error: unknown) {
+      const err = error as Error;
+      throw new BadRequestException(`Failed to list remotes: ${err.message}`);
+    }
+  }
+
+  /**
+   * Report database migration state
+   * GET /api/updates/database
+   */
+  @Get('database')
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async getDatabaseStatus(): Promise<DatabaseStatus> {
+    try {
+      return await this.updateService.getDatabaseStatus();
+    } catch (error: unknown) {
+      const err = error as Error;
+      throw new BadRequestException(`Failed to read database status: ${err.message}`);
+    }
+  }
+
+  /**
+   * List branches available on a remote
+   * GET /api/updates/branches?remote=origin
+   */
+  @Get('branches')
+  @HttpCode(HttpStatus.OK)
+  async listRemoteBranches(@Query('remote') remote?: string): Promise<string[]> {
+    try {
+      return await this.updateService.listRemoteBranches(remote);
+    } catch (error: unknown) {
+      const err = error as Error;
+      throw new BadRequestException(`Failed to list branches: ${err.message}`);
     }
   }
 
@@ -127,6 +185,8 @@ export class UpdateController {
       .executeUpdate(userId, {
         force: dto.force,
         skipBackup: dto.skipBackup,
+        remote: dto.remote,
+        branch: dto.branch,
       })
       .catch((error) => {
         console.error('Update execution failed:', error);

@@ -51,15 +51,41 @@ interface UpdateInfo {
   currentCommit: string;
   currentBranch?: string;
   remote?: string;
+  remoteBranch?: string;
   latestCommit?: string;
   commitsBehind?: number;
+  commitsAhead?: number;
   lastCommitMessage?: string;
   lastCommitDate?: string;
   lastCommitAuthor?: string;
+  localCommitMessage?: string;
+  localCommitDate?: string;
+  localCommitAuthor?: string;
+  remoteCommitMessage?: string;
+  remoteCommitDate?: string;
+  remoteCommitAuthor?: string;
   lastCheckAt: string;
   canUpdate: boolean;
   blockers?: string[];
   warning?: string;
+}
+
+interface GitRemote {
+  name: string;
+  url: string;
+  isDefault: boolean;
+}
+
+interface DatabaseStatus {
+  state: 'up-to-date' | 'pending' | 'failed' | 'unreachable' | 'unknown';
+  message: string;
+  migrationsFound?: number;
+  pendingMigrations: string[];
+  failedMigrations: string[];
+  actionRequired: boolean;
+  appliedDuringUpdate: boolean;
+  manualCommand?: string;
+  details?: string;
 }
 
 interface UpdateLog {
@@ -379,14 +405,47 @@ export function ConfigPage() {
 
   const isAdmin = authUser?.role === 'ADMIN';
 
+  const [selectedRemote, setSelectedRemote] = useState('');
+  const [selectedBranch, setSelectedBranch] = useState('');
+
+  const { data: gitRemotes } = useQuery({
+    queryKey: ['updates', 'remotes'],
+    queryFn: async () => {
+      return await apiClient.get<GitRemote[]>('/updates/remotes');
+    },
+    enabled: isAdmin,
+  });
+
+  const { data: gitBranches } = useQuery({
+    queryKey: ['updates', 'branches', selectedRemote],
+    queryFn: async () => {
+      const query = selectedRemote ? `?remote=${encodeURIComponent(selectedRemote)}` : '';
+      return await apiClient.get<string[]>(`/updates/branches${query}`);
+    },
+    enabled: isAdmin,
+  });
+
   const {
     data: updateInfo,
     isLoading: isCheckingUpdates,
     refetch: checkForUpdates,
   } = useQuery({
-    queryKey: ['updates', 'check'],
+    queryKey: ['updates', 'check', selectedRemote, selectedBranch],
     queryFn: async () => {
-      return await apiClient.get<UpdateInfo>('/updates/check');
+      const params = new URLSearchParams();
+      if (selectedRemote) params.set('remote', selectedRemote);
+      if (selectedBranch) params.set('branch', selectedBranch);
+      const query = params.toString();
+      return await apiClient.get<UpdateInfo>(`/updates/check${query ? `?${query}` : ''}`);
+    },
+    enabled: isAdmin,
+    refetchInterval: false,
+  });
+
+  const { data: databaseStatus, refetch: refetchDatabaseStatus } = useQuery({
+    queryKey: ['updates', 'database'],
+    queryFn: async () => {
+      return await apiClient.get<DatabaseStatus>('/updates/database');
     },
     enabled: isAdmin,
     refetchInterval: false,
@@ -967,6 +1026,8 @@ export function ConfigPage() {
     mutationFn: async () => {
       return await apiClient.post('/updates/trigger', {
         confirmation: 'UPDATE',
+        ...(selectedRemote ? { remote: selectedRemote } : {}),
+        ...(selectedBranch ? { branch: selectedBranch } : {}),
       });
     },
     onSuccess: () => {
@@ -4430,7 +4491,63 @@ export function ConfigPage() {
                     </div>
                     <div className="config-row">
                       <span className="config-label">Remote</span>
-                      <span className="mono-text">{updateInfo?.remote || 'origin'}</span>
+                      <select
+                        value={selectedRemote || updateInfo?.remote || ''}
+                        onChange={(event) => {
+                          setSelectedRemote(event.target.value);
+                          setSelectedBranch('');
+                        }}
+                        disabled={isCheckingUpdates || !gitRemotes || gitRemotes.length === 0}
+                      >
+                        {gitRemotes && gitRemotes.length > 0 ? (
+                          gitRemotes.map((remote) => (
+                            <option key={remote.name} value={remote.name} title={remote.url}>
+                              {remote.name}
+                              {remote.isDefault ? ' (tracking)' : ''}
+                            </option>
+                          ))
+                        ) : (
+                          <option value={updateInfo?.remote || ''}>
+                            {updateInfo?.remote || 'unknown'}
+                          </option>
+                        )}
+                      </select>
+                    </div>
+                    <div className="config-row">
+                      <span className="config-label">Compare Branch</span>
+                      <select
+                        value={selectedBranch || updateInfo?.remoteBranch || ''}
+                        onChange={(event) => setSelectedBranch(event.target.value)}
+                        disabled={isCheckingUpdates || !gitBranches || gitBranches.length === 0}
+                      >
+                        {gitBranches && gitBranches.length > 0 ? (
+                          <>
+                            {!gitBranches.includes(updateInfo?.remoteBranch || '') &&
+                              updateInfo?.remoteBranch && (
+                                <option value={updateInfo.remoteBranch}>
+                                  {updateInfo.remoteBranch} (missing)
+                                </option>
+                              )}
+                            {gitBranches.map((branch) => (
+                              <option key={branch} value={branch}>
+                                {branch}
+                              </option>
+                            ))}
+                          </>
+                        ) : (
+                          <option value={updateInfo?.remoteBranch || ''}>
+                            {updateInfo?.remoteBranch || 'unknown'}
+                          </option>
+                        )}
+                      </select>
+                    </div>
+                    <div className="config-row">
+                      <span className="config-label">Comparing Against</span>
+                      <span className="mono-text">
+                        {`${selectedRemote || updateInfo?.remote || '?'}/${
+                          selectedBranch || updateInfo?.remoteBranch || '?'
+                        }`}
+                      </span>
                     </div>
                     {(() => {
                       const localHash =
@@ -4468,6 +4585,13 @@ export function ConfigPage() {
                             <span className="mono-text" style={{ fontSize: '0.95rem' }}>
                               {localHash}
                             </span>
+                            {updateInfo?.localCommitDate && (
+                              <div
+                                style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '0.2rem' }}
+                              >
+                                {formatDate(updateInfo.localCommitDate)}
+                              </div>
+                            )}
                           </div>
                           {hasRemoteHash && (
                             <div>
@@ -4489,11 +4613,28 @@ export function ConfigPage() {
                               >
                                 {remoteHash}
                               </span>
+                              {updateInfo?.remoteCommitDate && (
+                                <div
+                                  style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '0.2rem' }}
+                                >
+                                  {formatDate(updateInfo.remoteCommitDate)}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
                       );
                     })()}
+                    {typeof updateInfo?.commitsAhead === 'number' &&
+                      updateInfo.commitsAhead > 0 && (
+                        <div
+                          style={{ fontSize: '0.8rem', color: '#f59e0b', marginBottom: '0.5rem' }}
+                        >
+                          {updateInfo.commitsAhead} local commit
+                          {updateInfo.commitsAhead !== 1 ? 's are' : ' is'} not on{' '}
+                          {`${updateInfo.remote}/${updateInfo.remoteBranch}`}
+                        </div>
+                      )}
                     {(() => {
                       const remoteRaw = updateInfo?.latestCommit || '';
                       const hasRemoteHash = /^[0-9a-f]{40}$/i.test(remoteRaw);
@@ -4525,13 +4666,66 @@ export function ConfigPage() {
                       </div>
                     )}
                     <div className="config-row">
+                      <span className="config-label">Database</span>
+                      <span
+                        style={{
+                          color: databaseStatus
+                            ? databaseStatus.state === 'up-to-date'
+                              ? '#22c55e'
+                              : databaseStatus.state === 'pending'
+                                ? '#f59e0b'
+                                : databaseStatus.state === 'unknown'
+                                  ? undefined
+                                  : '#ef4444'
+                            : undefined,
+                        }}
+                      >
+                        {databaseStatus ? databaseStatus.message : 'Checking schema...'}
+                      </span>
+                    </div>
+                    {databaseStatus?.actionRequired && (
+                      <div
+                        className={
+                          databaseStatus.state === 'pending' ? 'config-hint' : 'form-error'
+                        }
+                        style={{ marginBottom: '0.75rem', fontSize: '0.85rem' }}
+                      >
+                        {databaseStatus.pendingMigrations.length > 0 && (
+                          <div style={{ marginBottom: '0.4rem' }}>
+                            Pending: {databaseStatus.pendingMigrations.join(', ')}
+                          </div>
+                        )}
+                        {databaseStatus.failedMigrations.length > 0 && (
+                          <div style={{ marginBottom: '0.4rem' }}>
+                            Failed: {databaseStatus.failedMigrations.join(', ')}
+                          </div>
+                        )}
+                        <div style={{ marginBottom: '0.4rem' }}>
+                          {databaseStatus.appliedDuringUpdate
+                            ? 'Deploy Update applies these automatically. To apply them manually instead, run:'
+                            : 'This must be resolved manually before an update can run:'}
+                        </div>
+                        {databaseStatus.manualCommand && (
+                          <code
+                            className="mono-text"
+                            style={{ display: 'block', wordBreak: 'break-all' }}
+                          >
+                            {databaseStatus.manualCommand}
+                          </code>
+                        )}
+                      </div>
+                    )}
+                    <div className="config-row">
                       <span className="config-label">Last Check</span>
                       <span>{updateInfo ? formatDate(updateInfo.lastCheckAt) : 'Never'}</span>
                     </div>
                     <button
                       type="button"
                       className="submit-button"
-                      onClick={() => checkForUpdates()}
+                      onClick={() => {
+                        checkForUpdates();
+                        refetchDatabaseStatus();
+                      }}
                       disabled={isCheckingUpdates}
                     >
                       {isCheckingUpdates ? 'Checking...' : 'Check for Updates'}
@@ -4542,6 +4736,11 @@ export function ConfigPage() {
                     <h3>Status</h3>
                     {!updateInfo ? (
                       <div className="config-hint">Loading update information...</div>
+                    ) : !/^[0-9a-f]{40}$/i.test(updateInfo.latestCommit || '') ? (
+                      <div className="form-error">
+                        Cannot compare — {`${updateInfo.remote}/${updateInfo.remoteBranch}`} could
+                        not be resolved. Pick a branch that exists on this remote.
+                      </div>
                     ) : updateInfo.available ? (
                       <>
                         <div className="form-success" style={{ marginBottom: '1rem' }}>

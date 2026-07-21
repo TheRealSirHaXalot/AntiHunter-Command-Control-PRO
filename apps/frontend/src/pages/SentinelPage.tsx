@@ -4,7 +4,12 @@ import { MdDeleteSweep, MdRefresh, MdShield } from 'react-icons/md';
 
 import { apiClient } from '../api/client';
 import type { CommandRequest, CommandResponse, SiteSummary } from '../api/types';
-import { SENTINEL_DETECTORS, SENTINEL_GROUPS, SENTINEL_MODES } from '../data/sentinel';
+import {
+  SENTINEL_DEFAULT_MODE,
+  SENTINEL_DETECTORS,
+  SENTINEL_GROUPS,
+  SENTINEL_MODES,
+} from '../data/sentinel';
 import { useAuthStore } from '../stores/auth-store';
 import { useNodeStore } from '../stores/node-store';
 import { useSentinelStore } from '../stores/sentinel-store';
@@ -42,7 +47,7 @@ export function SentinelPage() {
   const [target, setTarget] = useState('@ALL');
   const [siteId, setSiteId] = useState<string | undefined>(undefined);
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
-  const [selectedMode, setSelectedMode] = useState<string | null>(null);
+  const [selectedMode, setSelectedMode] = useState<string>(SENTINEL_DEFAULT_MODE);
   const [selectedBoot, setSelectedBoot] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ level: 'ok' | 'error'; message: string } | null>(null);
 

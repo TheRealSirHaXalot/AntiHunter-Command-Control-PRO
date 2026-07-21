@@ -53,7 +53,15 @@ async function request<T>(input: RequestInfo | URL, options: RequestOptions = {}
 
   if (!response.ok) {
     const text = await response.text();
-    const apiError: ApiError = new Error(text || response.statusText);
+    // An empty-bodied 5xx never comes from the API itself (Nest always sends a
+    // JSON body). It means the request died before reaching the backend — the
+    // dev proxy answers ECONNREFUSED with a bodyless 500 while the server boots.
+    const unreachable = response.status >= 500 && !text.trim();
+    const apiError: ApiError = new Error(
+      unreachable
+        ? 'Cannot reach the server. It may still be starting — try again in a moment.'
+        : text || response.statusText,
+    );
     apiError.status = response.status;
     apiError.rawBody = text;
     if (text) {

@@ -8,7 +8,13 @@ import { UpdateBackupService } from './update-backup.service';
 import { UpdateConfigService } from './update-config.service';
 import { UpdateExecutorService } from './update-executor.service';
 import { UpdateGitService } from './update-git.service';
-import { UpdateInfo, UpdateCompleteEvent, PreflightResult } from './update.types';
+import {
+  UpdateInfo,
+  UpdateCompleteEvent,
+  PreflightResult,
+  GitRemoteInfo,
+  DatabaseStatus,
+} from './update.types';
 import { EventBusService } from '../events/event-bus.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -105,9 +111,110 @@ export class UpdateService implements OnModuleInit {
   }
 
   /**
+   * List configured git remotes, flagging the one used by default
+   */
+  async listRemotes(): Promise<GitRemoteInfo[]> {
+    const isRepo = await this.gitService.isGitRepository();
+    if (!isRepo) return [];
+
+    const remotes = await this.gitService.listRemotes();
+    const defaultSource = await this.resolveSource();
+
+    return remotes.map((remote) => ({
+      ...remote,
+      isDefault: remote.name === defaultSource.remote,
+    }));
+  }
+
+  /**
+   * Report the database migration state (read-only)
+   */
+  async getDatabaseStatus(): Promise<DatabaseStatus> {
+    return this.executor.getDatabaseStatus();
+  }
+
+  /**
+   * List branches available on a remote (refreshes remote-tracking refs first)
+   */
+  async listRemoteBranches(remote?: string): Promise<string[]> {
+    const isRepo = await this.gitService.isGitRepository();
+    if (!isRepo) return [];
+
+    const source = await this.resolveSource({ remote });
+
+    try {
+      await this.gitService.fetch(source.remote, 10000);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.warn(`Could not refresh ${source.remote}: ${err.message}. Using cached refs.`);
+    }
+
+    return this.gitService.listRemoteBranches(source.remote);
+  }
+
+  /**
+   * Resolve which remote/branch pair to compare against.
+   * An explicitly requested ref is honoured exactly, even if it does not exist.
+   * An implicit default that does not exist on the remote falls back to the
+   * checked-out branch name, so a stale AUTO_UPDATE_BRANCH cannot pin the
+   * comparison to a dead ref.
+   */
+  private async resolveSource(
+    overrides: { remote?: string; branch?: string } = {},
+  ): Promise<{ remote: string; branch: string; currentBranch: string }> {
+    const currentBranch = await this.gitService.getCurrentBranch();
+
+    const requestedRemote = this.sanitizeRef(overrides.remote);
+    let remote: string;
+
+    if (requestedRemote) {
+      const remotes = await this.gitService.listRemotes();
+      if (!remotes.some((entry) => entry.name === requestedRemote)) {
+        throw new Error(`Unknown git remote: ${requestedRemote}`);
+      }
+      remote = requestedRemote;
+    } else {
+      const trackingRemote = await this.gitService.getTrackingRemote(currentBranch);
+      remote = process.env.AUTO_UPDATE_REMOTE || trackingRemote || 'origin';
+    }
+
+    const requestedBranch = this.sanitizeRef(overrides.branch);
+    if (requestedBranch) {
+      return { remote, branch: requestedBranch, currentBranch };
+    }
+
+    const configuredBranch = process.env.AUTO_UPDATE_BRANCH || currentBranch || 'main';
+    if (await this.gitService.remoteBranchExists(remote, configuredBranch)) {
+      return { remote, branch: configuredBranch, currentBranch };
+    }
+
+    for (const candidate of [currentBranch, 'main', 'master']) {
+      if (!candidate || candidate === configuredBranch) continue;
+      if (await this.gitService.remoteBranchExists(remote, candidate)) {
+        this.logger.warn(
+          `${remote}/${configuredBranch} does not exist — comparing against ${remote}/${candidate}`,
+        );
+        return { remote, branch: candidate, currentBranch };
+      }
+    }
+
+    return { remote, branch: configuredBranch, currentBranch };
+  }
+
+  private sanitizeRef(value?: string): string | null {
+    if (!value) return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (!/^[A-Za-z0-9._/-]+$/.test(trimmed) || trimmed.includes('..')) {
+      throw new Error(`Invalid git ref: ${value}`);
+    }
+    return trimmed;
+  }
+
+  /**
    * Check for available updates
    */
-  async checkForUpdates(): Promise<UpdateInfo> {
+  async checkForUpdates(overrides: { remote?: string; branch?: string } = {}): Promise<UpdateInfo> {
     try {
       if (!this.isUpdateEnabled()) {
         this.logger.warn('Auto-update is disabled');
@@ -128,39 +235,41 @@ export class UpdateService implements OnModuleInit {
         };
       }
 
-      const currentBranch = await this.gitService.getCurrentBranch();
-      const trackingRemote = await this.gitService.getTrackingRemote(currentBranch);
+      const { remote, branch, currentBranch } = await this.resolveSource(overrides);
 
-      this.logger.log(`Detected: branch=${currentBranch}, tracking remote=${trackingRemote}`);
-
-      const branch = process.env.AUTO_UPDATE_BRANCH || currentBranch || 'main';
-      const remote = process.env.AUTO_UPDATE_REMOTE || trackingRemote || 'origin';
-
-      this.logger.log(`Using: branch=${branch}, remote=${remote}`);
+      this.logger.log(`Comparing HEAD (${currentBranch}) against ${remote}/${branch}`);
 
       // Get git status
       const status = await this.gitService.getStatus(remote, branch);
 
-      // Get remote commit details if updates are available
-      let remoteCommitDetails = null;
-      if (status.commitsBehind > 0) {
-        remoteCommitDetails = await this.gitService.getRemoteCommitDetails(remote, branch);
-      }
-
+      const remoteCommitDetails = await this.gitService.getRemoteCommitDetails(remote, branch);
       const remoteCommit = await this.gitService.getRemoteCommit(remote, branch).catch(() => null);
+
+      let warning = status.networkError;
+      if (!remoteCommit && !warning) {
+        warning = `Remote branch ${remote}/${branch} not found — fetch it before comparing.`;
+      }
 
       const updateInfo: UpdateInfo = {
         available: status.commitsBehind > 0,
         currentCommit: status.lastCommit?.hash || 'unknown',
         currentBranch: status.currentBranch,
         remote,
+        remoteBranch: branch,
         latestCommit: remoteCommit || undefined,
         commitsBehind: status.commitsBehind,
+        commitsAhead: status.commitsAhead,
         lastCommitMessage: remoteCommitDetails?.message || status.lastCommit?.message,
         lastCommitDate: remoteCommitDetails?.date || status.lastCommit?.date,
         lastCommitAuthor: remoteCommitDetails?.author || status.lastCommit?.author,
+        localCommitMessage: status.lastCommit?.message,
+        localCommitDate: status.lastCommit?.date,
+        localCommitAuthor: status.lastCommit?.author,
+        remoteCommitMessage: remoteCommitDetails?.message,
+        remoteCommitDate: remoteCommitDetails?.date,
+        remoteCommitAuthor: remoteCommitDetails?.author,
         lastCheckAt: new Date().toISOString(),
-        warning: status.networkError,
+        warning,
       };
 
       // Cache the result
@@ -197,6 +306,24 @@ export class UpdateService implements OnModuleInit {
    */
   async runPreflightChecks(): Promise<PreflightResult> {
     try {
+      const database = await this.getDatabaseStatus();
+      if (database.state === 'failed' || database.state === 'unreachable') {
+        return {
+          success: false,
+          error: `Database blocked the update: ${database.message}`,
+          resolutionOptions: [
+            {
+              action: 'resolve-database',
+              description:
+                database.state === 'unreachable'
+                  ? 'Start PostgreSQL and verify DATABASE_URL, then retry the update'
+                  : 'Resolve the failed migration, then retry the update',
+              command: database.manualCommand,
+            },
+          ],
+        };
+      }
+
       const result = await this.executor.executePreflightChecks();
 
       if (!result.success) {
@@ -281,7 +408,7 @@ export class UpdateService implements OnModuleInit {
    */
   async executeUpdate(
     userId: string,
-    options: { force?: boolean; skipBackup?: boolean } = {},
+    options: { force?: boolean; skipBackup?: boolean; remote?: string; branch?: string } = {},
   ): Promise<void> {
     if (this.updateInProgress) {
       throw new Error('An update is in progress');
@@ -291,12 +418,14 @@ export class UpdateService implements OnModuleInit {
       throw new Error('Auto-update is disabled');
     }
 
+    const source = await this.resolveSource({ remote: options.remote, branch: options.branch });
+    const remote = source.remote;
+    const branch = source.branch;
+
     this.updateInProgress = true;
 
     const updateLockFile = join(process.cwd(), '.update-in-progress');
     writeFileSync(updateLockFile, new Date().toISOString());
-    const remote = process.env.AUTO_UPDATE_REMOTE || 'origin';
-    const branch = process.env.AUTO_UPDATE_BRANCH || 'main';
 
     let backupPath: string | undefined;
     let configBackupPath: string | undefined;
