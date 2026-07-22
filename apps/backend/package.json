@@ -11,6 +11,7 @@
     "start:cluster": "node dist/main.cluster.js",
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "test": "ts-node --transpile-only --project tsconfig.json src/serial/serial-pipeline.test.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx,json}\"",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",

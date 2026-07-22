@@ -5,6 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
+  adm-zip: '>=0.6.0'
   glob: '>=10.5.0'
   esbuild: '>=0.25.0'
   tmp: '>=0.2.6'
@@ -123,7 +124,7 @@ importers:
         specifier: ^2.5.0
         version: 2.5.0
       adm-zip:
-        specifier: ^0.6.0
+        specifier: '>=0.6.0'
         version: 0.6.0
       argon2:
         specifier: ^0.44.0

@@ -18,6 +18,7 @@
     "AHCC:cluster": "powershell -NoLogo -NoProfile -Command \"$root = Get-Location; $jobs = @(); $jobs += Start-Job -ArgumentList $root { param($r) Set-Location $r; pnpm -C apps/backend dev:cluster }; $jobs += Start-Job -ArgumentList $root { param($r) Set-Location $r; pnpm -C apps/frontend dev }; $jobs | Receive-Job -Wait -AutoRemoveJob\"",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
     "format": "pnpm -r format",
     "seed": "pnpm --filter @command-center/backend prisma:seed",
     "tool:sniffer": "pnpm exec ts-node --transpile-only --project tools/tsconfig.sniffer.json tools/meshtastic-sniffer.ts",
@@ -35,6 +36,7 @@
   },
   "pnpm": {
     "overrides": {
+      "adm-zip": ">=0.6.0",
       "glob": ">=10.5.0",
       "esbuild": ">=0.25.0",
       "tmp": ">=0.2.6",
