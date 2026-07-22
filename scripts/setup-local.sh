@@ -757,7 +757,7 @@ check_pnpm() {
     if prompt_yes_no "Install pnpm?"; then
         if command -v corepack >/dev/null 2>&1; then
             info "Installing pnpm via corepack (requires sudo)..."
-            if sudo corepack enable && sudo corepack prepare pnpm@latest --activate; then
+            if sudo corepack enable && sudo corepack prepare pnpm@9.9.0 --activate; then
                 hash -r
                 if command -v pnpm >/dev/null 2>&1; then
                     success "pnpm installed: $(pnpm --version)"

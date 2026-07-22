@@ -429,7 +429,7 @@ install_pnpm() {
     fi
     
     sudo corepack enable || error_exit "Failed to enable corepack"
-    sudo corepack prepare pnpm@latest --activate || error_exit "Failed to activate pnpm"
+    sudo corepack prepare pnpm@9.9.0 --activate || error_exit "Failed to activate pnpm"
     
     pnpm --version || error_exit "pnpm installation verification failed"
     success "pnpm installed: $(pnpm --version)"
