@@ -181,7 +181,8 @@ Adjust system defaults (alarms, detection presets, serial ports, site federation
 
 Enable or disable optional modules (Sentinel, Scheduler, Alerts, Strategy Advisor, future analytics packs) to tailor the UI for your deployment. The updated capture shows the Addons catalog card, feature summaries, and the new badge callouts for beta-grade modules.
 
-![Addons management](images/addons.png)
+<img width="1151" height="948" alt="addons" src="https://github.com/user-attachments/assets/f699d5c3-c7a2-4a11-af9f-02c0e2403897" />
+
 
 #### Exports
 
