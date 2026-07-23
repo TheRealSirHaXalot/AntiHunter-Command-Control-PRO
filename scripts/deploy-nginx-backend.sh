@@ -63,10 +63,10 @@ ensure_pnpm() {
   if command -v corepack >/dev/null 2>&1; then
     log "Activating pnpm via corepack..."
     corepack enable
-    corepack prepare pnpm@9 --activate
+    corepack prepare pnpm@9.9.0 --activate
   else
     log "Installing pnpm globally via npm..."
-    npm install -g pnpm@9
+    npm install -g pnpm@9.9.0
   fi
 }
 
