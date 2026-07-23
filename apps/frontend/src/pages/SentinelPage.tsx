@@ -190,7 +190,7 @@ export function SentinelPage() {
                 </button>
                 <button
                   type="button"
-                  className="control-chip control-chip--danger"
+                  className="control-chip control-chip--ghost"
                   disabled={!canSend || busy}
                   onClick={() => send('SENTINEL_OFF')}
                 >
