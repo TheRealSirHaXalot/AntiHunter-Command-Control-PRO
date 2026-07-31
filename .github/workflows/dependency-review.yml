@@ -19,3 +19,4 @@ jobs:
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
+          allow-ghsas: GHSA-qwww-vcr4-c8h2, GHSA-mh99-v99m-4gvg

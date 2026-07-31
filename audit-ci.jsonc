@@ -1,0 +1,10 @@
+{
+  "$schema": "https://github.com/IBM/audit-ci/raw/main/docs/schema.json",
+  "high": true,
+  "allowlist": [
+    // react-router unstable-RSC CSRF; app uses no RSC and react-router-dom has no v8 to bump to.
+    "GHSA-qwww-vcr4-c8h2",
+    // brace-expansion OOM; every major pinned to a patched release (1.1.18/2.1.4/5.0.9), advisory <=5.0.7 range is over-broad.
+    "GHSA-mh99-v99m-4gvg"
+  ]
+}
