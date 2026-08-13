@@ -82,6 +82,7 @@ interface TestCase {
   expectKinds: string[];
   expectCategory?: string;
   expectNodeId?: string;
+  expectData?: Record<string, string | number>;
   skipHop?: boolean;
 }
 
@@ -574,6 +575,26 @@ const FIRMWARE_MESSAGES: TestCase[] = [
     input: 'AH5: EVILTWIN:AA:BB:CC:DD:EE:FF:tsf_anomaly:-45',
     expectKinds: ['alert'],
     expectCategory: 'sentinel',
+    expectData: { bssid: 'AA:BB:CC:DD:EE:FF', reason: 'tsf_anomaly', rssi: -45 },
+  },
+  {
+    name: 'EVILTWIN with ssid',
+    input: 'AH5: EVILTWIN:AA:BB:CC:DD:EE:FF:SSID_COLLISION:-86:DogeMiles',
+    expectKinds: ['alert'],
+    expectCategory: 'sentinel',
+    expectData: {
+      bssid: 'AA:BB:CC:DD:EE:FF',
+      reason: 'SSID_COLLISION',
+      rssi: -86,
+      ssid: 'DogeMiles',
+    },
+  },
+  {
+    name: 'EVILTWIN ssid containing colon',
+    input: 'AH5: EVILTWIN:AA:BB:CC:DD:EE:FF:SSID_COLLISION:-86:net:work',
+    expectKinds: ['alert'],
+    expectCategory: 'sentinel',
+    expectData: { rssi: -86, ssid: 'net:work' },
   },
   {
     name: 'OWE_ABUSE',
@@ -868,6 +889,20 @@ function runTest(label: string, rawInput: string, tc: TestCase): void {
         `FAIL [${label}]: category "${alertResult.category}" != "${tc.expectCategory}"`,
       );
       return;
+    }
+  }
+
+  if (tc.expectData) {
+    const alertResult = results.find((r): r is SerialAlertEvent => r.kind === 'alert');
+    const data = (alertResult?.data ?? {}) as Record<string, unknown>;
+    for (const [key, want] of Object.entries(tc.expectData)) {
+      if (data[key] !== want) {
+        failed++;
+        failures.push(
+          `FAIL [${label}]: data.${key} = ${JSON.stringify(data[key])} != ${JSON.stringify(want)}`,
+        );
+        return;
+      }
     }
   }
 
