@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState, type ComponentType } from 'react';
 import {
   MdChat,
+  MdClose,
   MdDownload,
   MdEventNote,
   MdExtension,
   MdHub,
   MdMap,
+  MdMenu,
   MdMyLocation,
   MdFingerprint,
   MdNetworkCheck,
@@ -20,7 +22,7 @@ import {
   MdTerminal,
   MdWifiTethering,
 } from 'react-icons/md';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 
 import { useAuthStore } from '../stores/auth-store';
 
@@ -64,6 +66,8 @@ export function SidebarNav() {
   const [adsbEnabled, setAdsbEnabled] = useState<boolean>(addons.adsb ?? false);
   const [acarsEnabled, setAcarsEnabled] = useState<boolean>(addons.acars ?? false);
   const [sentinelEnabled, setSentinelEnabled] = useState<boolean>(addons.sentinel ?? false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
     setStrategyEnabled(addons.strategy ?? false);
@@ -82,6 +86,10 @@ export function SidebarNav() {
     addons.acars,
     addons.sentinel,
   ]);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
 
   const navItems = useMemo(() => {
     return NAV_ITEMS.filter((item) => {
@@ -104,20 +112,58 @@ export function SidebarNav() {
     sentinelEnabled,
   ]);
 
+  const activeLabel = useMemo(() => {
+    const match = [...navItems]
+      .filter((item) => item.to !== '/')
+      .sort((a, b) => b.to.length - a.to.length)
+      .find((item) => location.pathname.startsWith(item.to));
+    return match?.label ?? 'Menu';
+  }, [navItems, location.pathname]);
+
+  const renderLink = (item: NavItem) => {
+    const { to, label, icon: Icon, hideOnMobile } = item;
+    return (
+      <NavLink
+        key={to}
+        to={to}
+        onClick={() => setMenuOpen(false)}
+        className={({ isActive }) =>
+          `nav-link ${isActive ? 'active' : ''}${hideOnMobile ? ' nav-link--mobile-hidden' : ''}`
+        }
+      >
+        <Icon className="nav-icon" />
+        <span className="nav-text">{label}</span>
+      </NavLink>
+    );
+  };
+
   return (
-    <aside className="sidebar">
-      {navItems.map(({ to, label, icon: Icon, hideOnMobile }) => (
-        <NavLink
-          key={to}
-          to={to}
-          className={({ isActive }) =>
-            `nav-link ${isActive ? 'active' : ''}${hideOnMobile ? ' nav-link--mobile-hidden' : ''}`
-          }
+    <>
+      <aside className="sidebar">{navItems.map(renderLink)}</aside>
+
+      <div className="mobile-navbar">
+        <button
+          type="button"
+          className="mobile-navbar__toggle"
+          aria-label="Navigation menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
         >
-          <Icon className="nav-icon" />
-          <span className="nav-text">{label}</span>
-        </NavLink>
-      ))}
-    </aside>
+          {menuOpen ? <MdClose className="nav-icon" /> : <MdMenu className="nav-icon" />}
+          <span>{menuOpen ? 'Close' : activeLabel}</span>
+        </button>
+      </div>
+
+      <div className={`mobile-nav-sheet${menuOpen ? ' open' : ''}`} aria-hidden={!menuOpen}>
+        <button
+          type="button"
+          className="mobile-nav-sheet__backdrop"
+          aria-label="Close menu"
+          tabIndex={menuOpen ? 0 : -1}
+          onClick={() => setMenuOpen(false)}
+        />
+        <nav className="mobile-nav-sheet__grid">{navItems.map(renderLink)}</nav>
+      </div>
+    </>
   );
 }

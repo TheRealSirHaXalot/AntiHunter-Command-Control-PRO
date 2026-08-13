@@ -291,6 +291,10 @@ a {
 .nav-text {
   font-weight: 500;
 }
+.mobile-navbar,
+.mobile-nav-sheet {
+  display: none;
+}
 .app-main {
   padding: 1.5rem;
   overflow-y: auto;

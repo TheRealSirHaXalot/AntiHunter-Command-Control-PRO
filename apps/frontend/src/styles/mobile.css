@@ -84,45 +84,120 @@
   .app-content {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr);
-    padding-bottom: 4.5rem;
+    padding-bottom: 1.5rem;
   }
 
   .sidebar {
-    display: flex !important;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: auto;
-    padding: 0.35rem 0.4rem calc(0.35rem + env(safe-area-inset-bottom, 0)) 0.4rem;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    border-right: none;
-    border-top: 1px solid rgba(148, 163, 184, 0.18);
-    background: rgba(5, 8, 15, 0.96);
-    backdrop-filter: blur(16px);
-    z-index: 1010;
-    overflow-x: auto;
+    display: none !important;
   }
 
-  .sidebar::-webkit-scrollbar {
+  .mobile-navbar {
+    display: flex;
+    position: fixed;
+    top: calc(0.6rem + env(safe-area-inset-top, 0));
+    right: 0.9rem;
+    z-index: 1015;
+  }
+
+  .mobile-navbar__toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.4rem;
+    border: 1px solid var(--color-accent);
+    border-radius: 0.6rem;
+    background: transparent;
+    color: var(--color-accent);
+  }
+
+  .mobile-navbar__toggle span {
     display: none;
   }
 
-  .nav-link {
-    flex-direction: column;
-    gap: 0.15rem;
-    width: auto !important;
-    flex: 1 1 0;
-    min-width: 58px;
-    padding: 0.35rem 0.45rem;
-    font-size: 0.7rem;
-    border-radius: 0.65rem;
-    text-align: center;
+  .mobile-navbar__toggle .nav-icon {
+    font-size: 1.4rem;
   }
 
-  .nav-link--mobile-hidden {
+  .mobile-nav-sheet {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1020;
+    visibility: hidden;
+    transition: visibility 0s linear 0.18s;
+  }
+
+  .mobile-nav-sheet.open {
+    visibility: visible;
+    transition: visibility 0s;
+  }
+
+  .mobile-nav-sheet__backdrop {
+    position: absolute;
+    inset: 0;
+    border: none;
+    padding: 0;
+    background: rgba(2, 6, 23, 0.55);
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+  }
+
+  .mobile-nav-sheet.open .mobile-nav-sheet__backdrop {
+    opacity: 1;
+  }
+
+  .mobile-nav-sheet__grid {
+    position: absolute;
+    top: calc(3.2rem + env(safe-area-inset-top, 0));
+    right: 0.75rem;
+    z-index: 1;
+    width: min(82vw, 17rem);
+    max-height: 78vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.5rem;
+    background: var(--color-sidebar-bg);
+    border: 1px solid var(--color-sidebar-border);
+    border-radius: 0.9rem;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
+    transform-origin: top right;
+    transform: scale(0.82);
+    opacity: 0;
+    transition:
+      transform 0.18s ease,
+      opacity 0.18s ease;
+  }
+
+  .mobile-nav-sheet.open .mobile-nav-sheet__grid {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  .mobile-nav-sheet__grid .nav-link {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.9rem;
+    padding: 0.85rem 0.9rem;
+    font-size: 0.95rem;
+    text-align: left;
+    border-radius: 0.6rem;
+  }
+
+  .mobile-nav-sheet__grid .nav-icon {
+    font-size: 1.4rem;
+    flex-shrink: 0;
+  }
+
+  .mobile-nav-sheet__grid .nav-text {
+    font-weight: 500;
+  }
+
+  .mobile-nav-sheet__grid .nav-link--mobile-hidden {
     display: none !important;
   }
 
@@ -563,18 +638,27 @@
     justify-content: center;
   }
 
-  .map-controls-row {
+  .controls-row.map-controls-row {
     display: flex;
-    gap: 0.25rem;
-    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    justify-content: flex-start;
   }
 
-  .map-controls-row > .control-chip {
-    flex: 1;
+  .controls-row.map-controls-row > .control-chip {
+    flex: 0 0 auto;
+    width: auto;
     min-width: 0;
+    max-width: none;
     min-height: 2.45rem;
-    font-size: 0.88rem;
-    padding-inline: 0.35rem;
+    font-size: 0.85rem;
+    padding-inline: 0.9rem;
+    white-space: nowrap;
+  }
+
+  .controls-row.map-controls-row > .control-chip:last-child:nth-child(odd) {
+    flex-basis: auto;
+    max-width: none;
   }
 
   .adsb-log-table-wrapper {
