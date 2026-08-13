@@ -58,7 +58,7 @@
     "rxjs": "^7.8.1",
     "sanitize-html": "^2.12.1",
     "socket.io": "^4.8.3",
-    "undici": "^6.24.0",
+    "undici": "^6.28.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
