@@ -1,4 +1,10 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { DeviceBaselineConfig, DevicePresence, InventoryDevice } from '@prisma/client';
 import { Subscription, concatMap, from } from 'rxjs';
 
@@ -13,25 +19,37 @@ export interface ClassificationSummary {
   at: string;
 }
 
+const EMPTY_COUNTS = (): Record<string, number> => ({
+  stationary: 0,
+  'frequent-flier': 0,
+  visitor: 0,
+  new: 0,
+  transient: 0,
+});
+
+const NOT_MIGRATED_MESSAGE =
+  'Device classification tables are not migrated yet. Run "pnpm update-db" (prisma migrate deploy).';
+
 @Injectable()
 export class DeviceClassificationService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DeviceClassificationService.name);
   private subscription?: Subscription;
   private autoTimer?: ReturnType<typeof setInterval>;
-  private config!: DeviceBaselineConfig;
+  private config: DeviceBaselineConfig | null = null;
+  private warnedUnready = false;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventoryService: InventoryService,
   ) {}
 
-  async onModuleInit(): Promise<void> {
-    this.config = await this.loadConfig();
+  onModuleInit(): void {
     this.subscription = this.inventoryService
       .getUpdatesStream()
       .pipe(concatMap((device) => from(this.record(device))))
       .subscribe();
     this.scheduleAutoClassify();
+    void this.ensureConfig();
   }
 
   onModuleDestroy(): void {
@@ -41,19 +59,37 @@ export class DeviceClassificationService implements OnModuleInit, OnModuleDestro
     }
   }
 
-  private async loadConfig(): Promise<DeviceBaselineConfig> {
-    const existing = await this.prisma.deviceBaselineConfig.findFirst();
-    if (existing) {
-      return existing;
+  private async ensureConfig(): Promise<DeviceBaselineConfig | null> {
+    if (this.config) {
+      return this.config;
     }
-    return this.prisma.deviceBaselineConfig.create({ data: {} });
+    try {
+      const existing = await this.prisma.deviceBaselineConfig.findFirst();
+      this.config = existing ?? (await this.prisma.deviceBaselineConfig.create({ data: {} }));
+      if (this.warnedUnready) {
+        this.logger.log('Device classification database is ready; feature active.');
+      }
+      this.warnedUnready = false;
+      this.scheduleAutoClassify();
+      return this.config;
+    } catch (error) {
+      if (!this.warnedUnready) {
+        this.warnedUnready = true;
+        this.logger.error(
+          `Device classification inactive — ${NOT_MIGRATED_MESSAGE} (${
+            error instanceof Error ? error.message : String(error)
+          })`,
+        );
+      }
+      return null;
+    }
   }
 
   private scheduleAutoClassify(): void {
     if (this.autoTimer) {
       clearInterval(this.autoTimer);
     }
-    const minutes = Math.max(1, this.config.autoClassifyMinutes);
+    const minutes = Math.max(1, this.config?.autoClassifyMinutes ?? 5);
     this.autoTimer = setInterval(() => {
       void this.classifyAll().catch((error) =>
         this.logger.warn(
@@ -64,6 +100,10 @@ export class DeviceClassificationService implements OnModuleInit, OnModuleDestro
   }
 
   private async record(device: InventoryDevice): Promise<void> {
+    const cfg = await this.ensureConfig();
+    if (!cfg) {
+      return;
+    }
     try {
       const mac = device.mac;
       const ts = device.lastSeen ? device.lastSeen.getTime() : Date.now();
@@ -92,7 +132,7 @@ export class DeviceClassificationService implements OnModuleInit, OnModuleDestro
         return;
       }
 
-      const gapMs = this.config.gapThresholdMinutes * 60_000;
+      const gapMs = cfg.gapThresholdMinutes * 60_000;
       const newVisit = !existing.currentVisitId || ts - existing.lastSeen.getTime() > gapMs;
       let currentVisitId = existing.currentVisitId;
 
@@ -143,7 +183,10 @@ export class DeviceClassificationService implements OnModuleInit, OnModuleDestro
   }
 
   async classifyAll(): Promise<ClassificationSummary> {
-    const cfg = this.config;
+    const cfg = await this.ensureConfig();
+    if (!cfg) {
+      return { classified: 0, counts: EMPTY_COUNTS(), at: new Date().toISOString() };
+    }
     const now = Date.now();
     const windowMs = cfg.rollingWindowMinutes * 60_000;
     const baselineStart = cfg.baselineStart ? cfg.baselineStart.getTime() : null;
@@ -174,13 +217,7 @@ export class DeviceClassificationService implements OnModuleInit, OnModuleDestro
       byMac.set(v.mac, list);
     }
 
-    const counts: Record<string, number> = {
-      stationary: 0,
-      'frequent-flier': 0,
-      visitor: 0,
-      new: 0,
-      transient: 0,
-    };
+    const counts = EMPTY_COUNTS();
     const updates = [];
     for (const device of devices) {
       const vs = byMac.get(device.mac) ?? [];
@@ -222,13 +259,21 @@ export class DeviceClassificationService implements OnModuleInit, OnModuleDestro
     return { classified: devices.length, counts, at: new Date(now).toISOString() };
   }
 
-  getConfig(): DeviceBaselineConfig {
-    return this.config;
+  async getConfig(): Promise<DeviceBaselineConfig> {
+    const cfg = await this.ensureConfig();
+    if (!cfg) {
+      throw new ServiceUnavailableException(NOT_MIGRATED_MESSAGE);
+    }
+    return cfg;
   }
 
   async updateConfig(dto: UpdateBaselineConfigDto): Promise<DeviceBaselineConfig> {
+    const cfg = await this.ensureConfig();
+    if (!cfg) {
+      throw new ServiceUnavailableException(NOT_MIGRATED_MESSAGE);
+    }
     this.config = await this.prisma.deviceBaselineConfig.update({
-      where: { id: this.config.id },
+      where: { id: cfg.id },
       data: { ...dto },
     });
     this.scheduleAutoClassify();
@@ -236,22 +281,33 @@ export class DeviceClassificationService implements OnModuleInit, OnModuleDestro
   }
 
   async establishBaseline(): Promise<ClassificationSummary> {
+    const cfg = await this.ensureConfig();
+    if (!cfg) {
+      throw new ServiceUnavailableException(NOT_MIGRATED_MESSAGE);
+    }
     this.config = await this.prisma.deviceBaselineConfig.update({
-      where: { id: this.config.id },
+      where: { id: cfg.id },
       data: { baselineStart: new Date() },
     });
     return this.classifyAll();
   }
 
   async resetBaseline(): Promise<DeviceBaselineConfig> {
+    const cfg = await this.ensureConfig();
+    if (!cfg) {
+      throw new ServiceUnavailableException(NOT_MIGRATED_MESSAGE);
+    }
     this.config = await this.prisma.deviceBaselineConfig.update({
-      where: { id: this.config.id },
+      where: { id: cfg.id },
       data: { baselineStart: null },
     });
     return this.config;
   }
 
-  listDevices(search?: string): Promise<DevicePresence[]> {
+  async listDevices(search?: string): Promise<DevicePresence[]> {
+    if (!(await this.ensureConfig())) {
+      return [];
+    }
     const term = search?.trim();
     return this.prisma.devicePresence.findMany({
       where: term
@@ -270,6 +326,9 @@ export class DeviceClassificationService implements OnModuleInit, OnModuleDestro
   }
 
   async clear(): Promise<void> {
+    if (!(await this.ensureConfig())) {
+      return;
+    }
     await this.prisma.deviceVisit.deleteMany();
     await this.prisma.devicePresence.deleteMany();
   }

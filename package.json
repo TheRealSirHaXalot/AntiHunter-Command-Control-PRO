@@ -11,11 +11,11 @@
     "apps/frontend"
   ],
   "scripts": {
-    "dev": "pnpm -r --parallel dev",
-    "dev:silent": "SILENT=true pnpm -r --parallel dev:silent",
+    "dev": "pnpm update-db && pnpm -r --parallel dev",
+    "dev:silent": "pnpm update-db && SILENT=true pnpm -r --parallel dev:silent",
     "AHCC": "pnpm dev",
     "AHCC:silent": "pnpm dev:silent",
-    "AHCC:cluster": "powershell -NoLogo -NoProfile -Command \"$root = Get-Location; $jobs = @(); $jobs += Start-Job -ArgumentList $root { param($r) Set-Location $r; pnpm -C apps/backend dev:cluster }; $jobs += Start-Job -ArgumentList $root { param($r) Set-Location $r; pnpm -C apps/frontend dev }; $jobs | Receive-Job -Wait -AutoRemoveJob\"",
+    "AHCC:cluster": "powershell -NoLogo -NoProfile -Command \"pnpm update-db; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; $root = Get-Location; $jobs = @(); $jobs += Start-Job -ArgumentList $root { param($r) Set-Location $r; pnpm -C apps/backend dev:cluster }; $jobs += Start-Job -ArgumentList $root { param($r) Set-Location $r; pnpm -C apps/frontend dev }; $jobs | Receive-Job -Wait -AutoRemoveJob\"",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
