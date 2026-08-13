@@ -10,7 +10,10 @@ import {
   DeviceCategory,
   PresenceDevice,
 } from '../api/device-classification';
+import type { CommandRequest, CommandResponse, SiteSummary } from '../api/types';
 import { useAuthStore } from '../stores/auth-store';
+import { useBaselineStore } from '../stores/baseline-store';
+import { useNodeStore } from '../stores/node-store';
 
 const CATEGORY_META: Record<DeviceCategory, { label: string; color: string; blurb: string }> = {
   stationary: { label: 'Stationary', color: '#22c55e', blurb: 'here almost all the time' },
@@ -63,6 +66,11 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleString();
 }
 
+function formatClock(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleTimeString();
+}
+
 function categoryBadge(category: DeviceCategory | null) {
   if (!category) {
     return <span style={{ color: 'var(--color-text-muted)' }}>—</span>;
@@ -76,12 +84,62 @@ function categoryBadge(category: DeviceCategory | null) {
 }
 
 export function BaselinePage() {
+  const role = useAuthStore((state) => state.user?.role ?? null);
+  const isAdmin = role === 'ADMIN';
+  const canSend = role === 'ADMIN' || role === 'OPERATOR';
+  const queryClient = useQueryClient();
+
+  const nodes = useNodeStore((state) => state.nodes);
+  const bStatus = useBaselineStore((state) => state.status);
+  const bAnomalies = useBaselineStore((state) => state.anomalies);
+  const bDone = useBaselineStore((state) => state.done);
+  const clearBaselineFeed = useBaselineStore((state) => state.clear);
+  const [target, setTarget] = useState('@ALL');
+  const [fwSiteId, setFwSiteId] = useState<string | undefined>(undefined);
+  const [duration, setDuration] = useState(300);
+  const [forever, setForever] = useState(false);
+  const [fwFeedback, setFwFeedback] = useState<{ level: 'ok' | 'error'; message: string } | null>(
+    null,
+  );
+
+  const { data: sites } = useQuery({
+    queryKey: ['sites'],
+    queryFn: () => apiClient.get<SiteSummary[]>('/sites'),
+  });
+
+  const targetOptions = useMemo(() => {
+    const options = [{ value: '@ALL', label: 'All nodes (@ALL)' }];
+    Object.values(nodes).forEach((node) => {
+      const value = `@${node.id.toUpperCase()}`;
+      options.push({ value, label: node.name ? `${node.name} (${value})` : value });
+    });
+    return options;
+  }, [nodes]);
+
+  const command = useMutation<CommandResponse, Error, CommandRequest>({
+    mutationFn: (body) => apiClient.post<CommandResponse>('/commands/send', body),
+    onSuccess: (data, variables) =>
+      setFwFeedback({ level: 'ok', message: `${variables.name} queued (${data.id.slice(0, 8)})` }),
+    onError: (error, variables) =>
+      setFwFeedback({
+        level: 'error',
+        message: `${variables.name} failed: ${error instanceof Error ? error.message : 'error'}`,
+      }),
+  });
+
+  const send = (name: string, params: string[] = []) => {
+    if (!canSend) return;
+    command.mutate({ target, name, params, siteId: fwSiteId });
+  };
+
+  const startBaseline = () =>
+    send('BASELINE_START', forever ? [String(duration), 'FOREVER'] : [String(duration)]);
+
+  const statusRows = useMemo(() => Object.values(bStatus), [bStatus]);
+
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<DeviceCategory | 'all'>('all');
   const [draft, setDraft] = useState<BaselineConfigInput>({});
-  const role = useAuthStore((state) => state.user?.role ?? null);
-  const isAdmin = role === 'ADMIN';
-  const queryClient = useQueryClient();
 
   const { data: config } = useQuery<BaselineConfig>({
     queryKey: ['device-classification', 'config'],
@@ -123,23 +181,19 @@ export function BaselinePage() {
       apiClient.put<BaselineConfig>('/device-classification/config', body),
     onSuccess: invalidate,
   });
-
   const classifyNow = useMutation({
     mutationFn: () => apiClient.post<ClassificationSummary>('/device-classification/classify'),
     onSuccess: invalidate,
   });
-
-  const establishBaseline = useMutation({
+  const establishClassifierBaseline = useMutation({
     mutationFn: () => apiClient.post<ClassificationSummary>('/device-classification/baseline'),
     onSuccess: invalidate,
   });
-
-  const resetBaseline = useMutation({
+  const resetClassifierBaseline = useMutation({
     mutationFn: () => apiClient.delete('/device-classification/baseline'),
     onSuccess: invalidate,
   });
-
-  const clearAll = useMutation({
+  const clearClassifier = useMutation({
     mutationFn: () => apiClient.delete('/device-classification'),
     onSuccess: invalidate,
   });
@@ -175,24 +229,255 @@ export function BaselinePage() {
           <MdFingerprint /> Baseline
         </h1>
         <p className="form-hint">
-          Learns what devices are normal at your site, then labels each one by how it comes and
-          goes. Establish a baseline snapshot, and anything new or unusual stands out.
+          Run the on-node baseline anomaly detector and watch its results, then let the command
+          center profile how each device comes and goes over time.
         </p>
       </header>
 
       <article className="config-card">
         <div className="panel__header">
-          <h2 className="panel__title">Baseline snapshot</h2>
+          <h2 className="panel__title">Firmware baseline detector</h2>
+          {statusRows.length > 0 && (
+            <span className="status-pill">
+              {statusRows.filter((s) => s.scanning).length} scanning /{' '}
+              {statusRows.filter((s) => s.established).length} established
+            </span>
+          )}
+        </div>
+        <p className="form-hint">
+          Each node learns the RF devices normally present, then reports new / returning / RSSI
+          anomalies and devices that disappear. Start it on one node, a whole site, or all nodes.
+        </p>
+
+        <div className="baseline-grid">
+          <div className="baseline-field">
+            <label className="form-label" htmlFor="fw-target">
+              Target
+            </label>
+            <select
+              id="fw-target"
+              className="control-input"
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+            >
+              {targetOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <span className="form-hint">Single node, or @ALL for every node.</span>
+          </div>
+
+          {sites && sites.length > 1 && (
+            <div className="baseline-field">
+              <label className="form-label" htmlFor="fw-site">
+                Site
+              </label>
+              <select
+                id="fw-site"
+                className="control-input"
+                value={fwSiteId ?? ''}
+                onChange={(e) => setFwSiteId(e.target.value || undefined)}
+              >
+                <option value="">All sites</option>
+                {sites.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name ?? s.id}
+                  </option>
+                ))}
+              </select>
+              <span className="form-hint">Scope the command to one site.</span>
+            </div>
+          )}
+
+          <div className="baseline-field">
+            <label className="form-label" htmlFor="fw-duration">
+              Duration (seconds)
+            </label>
+            <input
+              id="fw-duration"
+              className="control-input"
+              type="number"
+              min={60}
+              value={duration}
+              disabled={forever}
+              onChange={(e) => setDuration(Number(e.target.value))}
+            />
+            <span className="form-hint">
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                <input
+                  type="checkbox"
+                  checked={forever}
+                  onChange={(e) => setForever(e.target.checked)}
+                />
+                Run until stopped (FOREVER)
+              </label>
+            </span>
+          </div>
+        </div>
+
+        <div className="sentinel-controls">
+          <button
+            type="button"
+            className="control-chip control-chip--primary"
+            disabled={!canSend || command.isPending}
+            onClick={startBaseline}
+          >
+            Establish baseline
+          </button>
+          <button
+            type="button"
+            className="control-chip"
+            disabled={!canSend || command.isPending}
+            onClick={() => send('BASELINE_STATUS')}
+          >
+            Query status
+          </button>
+          <button
+            type="button"
+            className="control-chip control-chip--danger"
+            disabled={!canSend || command.isPending}
+            onClick={() => send('STOP')}
+          >
+            Stop
+          </button>
+          {(statusRows.length > 0 || bAnomalies.length > 0) && (
+            <button
+              type="button"
+              className="control-chip control-chip--ghost"
+              onClick={clearBaselineFeed}
+            >
+              Clear feed
+            </button>
+          )}
+        </div>
+        {fwFeedback && (
+          <p
+            className="form-hint"
+            style={{
+              color:
+                fwFeedback.level === 'error' ? 'var(--alert-color-alert)' : 'var(--color-accent)',
+            }}
+          >
+            {fwFeedback.message}
+          </p>
+        )}
+        {!canSend && <p className="form-hint">Viewer role — controls are read-only.</p>}
+
+        {statusRows.length > 0 && (
+          <div className="table-wrap" style={{ marginTop: '0.75rem' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Node</th>
+                  <th>Scanning</th>
+                  <th>Established</th>
+                  <th>Devices</th>
+                  <th>Anomalies</th>
+                  <th>Phase</th>
+                  <th>Updated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {statusRows.map((s) => {
+                  const done = bDone[s.nodeId];
+                  return (
+                    <tr key={s.nodeId}>
+                      <td>{s.nodeId}</td>
+                      <td>{s.scanning ? 'Yes' : 'No'}</td>
+                      <td>{s.established ? 'Yes' : 'No'}</td>
+                      <td>{s.devices}</td>
+                      <td>{s.anomalies}</td>
+                      <td style={{ fontSize: '0.85em', color: 'var(--color-text-muted)' }}>
+                        {s.phase ?? '—'}
+                        {done ? ` · done: ${done.tx ?? 0} tx / ${done.pend ?? 0} pend` : ''}
+                      </td>
+                      <td style={{ fontSize: '0.85em' }}>{formatClock(s.updatedAt)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </article>
+
+      <article className="config-card">
+        <div className="panel__header">
+          <h2 className="panel__title">Baseline results ({bAnomalies.length})</h2>
+        </div>
+        {bAnomalies.length === 0 ? (
+          <div className="empty-state">
+            No baseline anomalies yet — they stream in here as nodes report NEW / RETURN / RSSI
+            anomalies and disappeared devices.
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Node</th>
+                  <th>Event</th>
+                  <th>MAC</th>
+                  <th>Type</th>
+                  <th>RSSI</th>
+                  <th>Detail</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bAnomalies.map((a) => (
+                  <tr key={a.id}>
+                    <td style={{ fontSize: '0.85em' }}>{formatClock(a.timestamp)}</td>
+                    <td style={{ fontSize: '0.85em' }}>{a.nodeId}</td>
+                    <td>
+                      <span
+                        className="status-pill"
+                        style={
+                          a.event === 'disappeared'
+                            ? { borderColor: '#94a3b8', color: '#94a3b8' }
+                            : { borderColor: '#f97316', color: '#f97316' }
+                        }
+                      >
+                        {a.event === 'disappeared' ? 'GONE' : (a.kind ?? 'ANOMALY')}
+                      </span>
+                    </td>
+                    <td style={{ fontFamily: 'monospace', fontSize: '0.85em' }}>{a.mac ?? '—'}</td>
+                    <td>{a.type ?? '—'}</td>
+                    <td>
+                      {a.rssi != null ? (
+                        <span style={{ color: rssiColor(a.rssi) }}>{a.rssi}</span>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td style={{ fontSize: '0.85em', color: 'var(--color-text-muted)' }}>
+                      {a.event === 'disappeared'
+                        ? `absent ${a.absentSeconds ?? '?'}s`
+                        : [a.reason, a.name ? `(${a.name})` : null].filter(Boolean).join(' ') ||
+                          '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </article>
+
+      <article className="config-card">
+        <div className="panel__header">
+          <h2 className="panel__title">Device classification</h2>
           <span className="status-pill">
             {total} indexed ·{' '}
-            {config?.baselineStart
-              ? `baseline ${formatTime(config.baselineStart)}`
-              : 'no baseline yet'}
+            {config?.baselineStart ? `baseline ${formatTime(config.baselineStart)}` : 'no baseline'}
           </span>
         </div>
         <p className="form-hint">
-          &ldquo;Establish baseline&rdquo; marks the current moment as normal. Devices seen before
-          it are residents; anything appearing after is a candidate Visitor or New device.
+          Command-center analytics over every sighting: labels each device Stationary / Frequent
+          Flier / Visitor / New from how often and how long it is seen. Independent of the on-node
+          detector above.
         </p>
         <div className="sentinel-controls">
           <button
@@ -208,40 +493,31 @@ export function BaselinePage() {
               <button
                 type="button"
                 className="control-chip"
-                onClick={() => establishBaseline.mutate()}
-                disabled={establishBaseline.isPending}
+                onClick={() => establishClassifierBaseline.mutate()}
+                disabled={establishClassifierBaseline.isPending}
               >
-                Establish baseline
+                Set baseline point
               </button>
               <button
                 type="button"
                 className="control-chip control-chip--ghost"
-                onClick={() => resetBaseline.mutate()}
-                disabled={resetBaseline.isPending || !config?.baselineStart}
+                onClick={() => resetClassifierBaseline.mutate()}
+                disabled={resetClassifierBaseline.isPending || !config?.baselineStart}
               >
-                Reset baseline
+                Reset baseline point
               </button>
               <button
                 type="button"
                 className="control-chip control-chip--danger"
-                onClick={() => clearAll.mutate()}
-                disabled={clearAll.isPending}
+                onClick={() => clearClassifier.mutate()}
+                disabled={clearClassifier.isPending}
               >
                 Clear index
               </button>
             </>
           )}
         </div>
-      </article>
 
-      <article className="config-card">
-        <div className="panel__header">
-          <h2 className="panel__title">Classification settings</h2>
-        </div>
-        <p className="form-hint">
-          Tune how devices are scored. The defaults suit most sites — change these only if labels
-          don&rsquo;t match what you see.
-        </p>
         <div className="baseline-grid">
           {CONFIG_FIELDS.map((field) => (
             <div key={field.key} className="baseline-field">
@@ -278,18 +554,7 @@ export function BaselinePage() {
             </button>
           </div>
         )}
-      </article>
 
-      <article className="config-card">
-        <div className="panel__header">
-          <h2 className="panel__title">Classified devices</h2>
-          <input
-            className="control-input baseline-search"
-            placeholder="Search MAC, vendor, name…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
         <div className="baseline-filter">
           <button
             type="button"
@@ -320,6 +585,12 @@ export function BaselinePage() {
               {CATEGORY_META[cat].label} ({counts[cat] ?? 0})
             </button>
           ))}
+          <input
+            className="control-input baseline-search"
+            placeholder="Search MAC, vendor, name…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
 
         <p className="form-hint baseline-legend">

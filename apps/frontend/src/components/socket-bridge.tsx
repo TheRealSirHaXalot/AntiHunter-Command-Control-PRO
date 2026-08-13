@@ -19,6 +19,12 @@ import { useSocket } from '../providers/socket-provider';
 import { useAdsbStore } from '../stores/adsb-store';
 import { useAlertStore } from '../stores/alert-store';
 import { useAuthStore } from '../stores/auth-store';
+import { useBaselineStore } from '../stores/baseline-store';
+import type {
+  BaselineAnomalyEntry,
+  BaselineDoneSummary,
+  BaselineNodeStatus,
+} from '../stores/baseline-store';
 import { useChatKeyStore } from '../stores/chat-key-store';
 import { useChatStore } from '../stores/chat-store';
 import { useDroneStore } from '../stores/drone-store';
@@ -647,6 +653,18 @@ export function SocketBridge() {
           useSentinelStore.getState().setStatus(sentinelEvent.status);
         } else {
           useSentinelStore.getState().addDetection(sentinelEvent.detection);
+        }
+      }
+
+      const baselineEvent = extractBaselineEvent(payload);
+      if (baselineEvent) {
+        const store = useBaselineStore.getState();
+        if (baselineEvent.mode === 'status') {
+          store.setStatus(baselineEvent.status);
+        } else if (baselineEvent.mode === 'anomaly') {
+          store.addAnomaly(baselineEvent.anomaly);
+        } else {
+          store.setDone(baselineEvent.done);
         }
       }
     };
@@ -1433,6 +1451,101 @@ function extractSentinelEvent(payload: unknown): SentinelEventResult | null {
       timestamp,
     },
   };
+}
+
+type BaselineEventResult =
+  | { mode: 'status'; status: BaselineNodeStatus }
+  | { mode: 'anomaly'; anomaly: BaselineAnomalyEntry }
+  | { mode: 'done'; done: BaselineDoneSummary };
+
+function extractBaselineEvent(payload: unknown): BaselineEventResult | null {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+  const base = payload as {
+    type?: string;
+    category?: string;
+    nodeId?: string;
+    timestamp?: string;
+    data?: Record<string, unknown>;
+  };
+  if (base.type !== 'event.alert' || !base.nodeId) {
+    return null;
+  }
+  const category = typeof base.category === 'string' ? base.category.toLowerCase() : '';
+  const data = base.data ?? {};
+  const timestamp = typeof base.timestamp === 'string' ? base.timestamp : new Date().toISOString();
+  const nodeId = base.nodeId;
+  const str = (value: unknown): string | undefined =>
+    typeof value === 'string' ? value : undefined;
+  const makeId = () =>
+    typeof window !== 'undefined' && window.crypto?.randomUUID
+      ? window.crypto.randomUUID()
+      : `${nodeId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  if (category === 'baseline-done') {
+    return {
+      mode: 'done',
+      done: {
+        nodeId,
+        devices: toNumber(data.Devices),
+        anomalies: toNumber(data.Anomalies),
+        wifi: toNumber(data.WiFi),
+        ble: toNumber(data.BLE),
+        tx: toNumber(data.TX),
+        pend: toNumber(data.PEND),
+        timestamp,
+      },
+    };
+  }
+  if (category === 'baseline') {
+    if (data.event === 'device-disappeared') {
+      return {
+        mode: 'anomaly',
+        anomaly: {
+          id: makeId(),
+          nodeId,
+          timestamp,
+          event: 'disappeared',
+          mac: str(data.mac),
+          absentSeconds: toNumber(data.absentSeconds),
+        },
+      };
+    }
+    if ('scanning' in data || 'established' in data) {
+      return {
+        mode: 'status',
+        status: {
+          nodeId,
+          scanning: data.scanning === 'YES' || data.scanning === true,
+          established: data.established === 'YES' || data.established === true,
+          devices: toNumber(data.devices) ?? 0,
+          anomalies: toNumber(data.anomalies) ?? 0,
+          phase: str(data.phase),
+          updatedAt: timestamp,
+        },
+      };
+    }
+    return null;
+  }
+  if (category === 'anomaly') {
+    return {
+      mode: 'anomaly',
+      anomaly: {
+        id: makeId(),
+        nodeId,
+        timestamp,
+        event: 'anomaly',
+        kind: str(data.kind),
+        type: str(data.type),
+        mac: str(data.mac),
+        rssi: toNumber(data.rssi),
+        reason: str(data.reason),
+        name: str(data.name),
+      },
+    };
+  }
+  return null;
 }
 
 function isChatMessage(payload: unknown): payload is ChatMessage {
