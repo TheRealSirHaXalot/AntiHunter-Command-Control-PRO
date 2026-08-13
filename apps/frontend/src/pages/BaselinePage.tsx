@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
+import { MdFingerprint } from 'react-icons/md';
 
 import { apiClient } from '../api/client';
 import {
@@ -11,29 +12,45 @@ import {
 } from '../api/device-classification';
 import { useAuthStore } from '../stores/auth-store';
 
-const CATEGORY_META: Record<DeviceCategory, { label: string; color: string }> = {
-  stationary: { label: 'Stationary', color: '#22c55e' },
-  'frequent-flier': { label: 'Frequent Flier', color: '#a855f7' },
-  visitor: { label: 'Visitor', color: '#f97316' },
-  new: { label: 'New', color: '#38bdf8' },
-  transient: { label: 'Transient', color: '#94a3b8' },
+const CATEGORY_META: Record<DeviceCategory, { label: string; color: string; blurb: string }> = {
+  stationary: { label: 'Stationary', color: '#22c55e', blurb: 'here almost all the time' },
+  'frequent-flier': { label: 'Frequent Flier', color: '#a855f7', blurb: 'comes and goes often' },
+  visitor: { label: 'Visitor', color: '#f97316', blurb: 'showed up after baseline, then left' },
+  new: { label: 'New', color: '#38bdf8', blurb: 'showed up after baseline, still here' },
+  transient: { label: 'Transient', color: '#94a3b8', blurb: 'seen briefly, no clear pattern' },
 };
 
 const CONFIG_FIELDS: Array<{ key: keyof BaselineConfigInput; label: string; hint: string }> = [
-  { key: 'rollingWindowMinutes', label: 'Window (min)', hint: 'Interval classified over' },
-  { key: 'gapThresholdMinutes', label: 'Visit gap (min)', hint: 'Absence that ends a visit' },
+  {
+    key: 'rollingWindowMinutes',
+    label: 'Scoring window (minutes)',
+    hint: 'How far back to look when labeling a device. 1440 = the last 24 hours.',
+  },
+  {
+    key: 'gapThresholdMinutes',
+    label: 'New-visit gap (minutes)',
+    hint: 'If a device disappears for longer than this and returns, it counts as a new visit.',
+  },
   {
     key: 'frequentFlierVisits',
-    label: 'Frequent ≥ visits',
-    hint: 'Visits in window ⇒ frequent flier',
+    label: 'Frequent-flier visits',
+    hint: 'This many separate visits inside the window labels a device a Frequent Flier.',
   },
   {
     key: 'visitorAbsenceMinutes',
-    label: 'Visitor absence (min)',
-    hint: 'Gone this long ⇒ departed',
+    label: 'Departed after (minutes)',
+    hint: 'A device gone at least this long (that first appeared after baseline) is a Visitor.',
   },
-  { key: 'stationaryPresencePct', label: 'Stationary ≥ %', hint: 'Present this % of window' },
-  { key: 'autoClassifyMinutes', label: 'Auto-run (min)', hint: 'Re-classify interval' },
+  {
+    key: 'stationaryPresencePct',
+    label: 'Stationary presence (%)',
+    hint: 'Present for at least this share of the window labels a device Stationary.',
+  },
+  {
+    key: 'autoClassifyMinutes',
+    label: 'Auto-classify every (minutes)',
+    hint: 'How often the labels recompute on their own, in addition to Classify now.',
+  },
 ];
 
 function rssiColor(rssi: number): string {
@@ -52,10 +69,7 @@ function categoryBadge(category: DeviceCategory | null) {
   }
   const meta = CATEGORY_META[category];
   return (
-    <span
-      className="badge"
-      style={{ borderColor: meta.color, color: meta.color, fontSize: '0.75em' }}
-    >
+    <span className="status-pill" style={{ borderColor: meta.color, color: meta.color }}>
       {meta.label}
     </span>
   );
@@ -73,6 +87,7 @@ export function BaselinePage() {
     queryKey: ['device-classification', 'config'],
     queryFn: () => apiClient.get<BaselineConfig>('/device-classification/config'),
     refetchInterval: 30_000,
+    retry: false,
   });
 
   const {
@@ -151,23 +166,38 @@ export function BaselinePage() {
       );
   }, [devices, filter, search]);
 
+  const total = (devices ?? []).length;
+
   return (
-    <section className="panel">
-      <header className="panel__header">
-        <div>
-          <h1 className="panel__title">Baseline</h1>
-          <p className="panel__subtitle">
-            {(devices ?? []).length} device{(devices ?? []).length !== 1 ? 's' : ''} indexed ·
-            baseline{' '}
+    <div className="page-stack">
+      <header className="page-header">
+        <h1 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+          <MdFingerprint /> Baseline
+        </h1>
+        <p className="form-hint">
+          Learns what devices are normal at your site, then labels each one by how it comes and
+          goes. Establish a baseline snapshot, and anything new or unusual stands out.
+        </p>
+      </header>
+
+      <article className="config-card">
+        <div className="panel__header">
+          <h2 className="panel__title">Baseline snapshot</h2>
+          <span className="status-pill">
+            {total} indexed ·{' '}
             {config?.baselineStart
-              ? `established ${formatTime(config.baselineStart)}`
-              : 'not established'}
-          </p>
+              ? `baseline ${formatTime(config.baselineStart)}`
+              : 'no baseline yet'}
+          </span>
         </div>
-        <div className="controls-row">
+        <p className="form-hint">
+          &ldquo;Establish baseline&rdquo; marks the current moment as normal. Devices seen before
+          it are residents; anything appearing after is a candidate Visitor or New device.
+        </p>
+        <div className="sentinel-controls">
           <button
             type="button"
-            className="control-chip"
+            className="control-chip control-chip--primary"
             onClick={() => classifyNow.mutate()}
             disabled={classifyNow.isPending}
           >
@@ -185,7 +215,7 @@ export function BaselinePage() {
               </button>
               <button
                 type="button"
-                className="control-chip"
+                className="control-chip control-chip--ghost"
                 onClick={() => resetBaseline.mutate()}
                 disabled={resetBaseline.isPending || !config?.baselineStart}
               >
@@ -197,150 +227,170 @@ export function BaselinePage() {
                 onClick={() => clearAll.mutate()}
                 disabled={clearAll.isPending}
               >
-                Clear
+                Clear index
               </button>
             </>
           )}
         </div>
-      </header>
+      </article>
 
-      <div
-        className="controls-row"
-        style={{ flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}
-      >
-        {CONFIG_FIELDS.map((field) => (
-          <label
-            key={field.key}
-            style={{ display: 'flex', flexDirection: 'column', fontSize: '0.75em' }}
-            title={field.hint}
-          >
-            <span style={{ color: 'var(--color-text-muted)' }}>{field.label}</span>
-            <input
-              className="control-input"
-              type="number"
-              style={{ width: '7rem' }}
-              value={draft[field.key] ?? ''}
-              disabled={!isAdmin}
-              onChange={(e) =>
-                setDraft((prev) => ({
-                  ...prev,
-                  [field.key]: e.target.value === '' ? undefined : Number(e.target.value),
-                }))
-              }
-            />
-          </label>
-        ))}
+      <article className="config-card">
+        <div className="panel__header">
+          <h2 className="panel__title">Classification settings</h2>
+        </div>
+        <p className="form-hint">
+          Tune how devices are scored. The defaults suit most sites — change these only if labels
+          don&rsquo;t match what you see.
+        </p>
+        <div className="baseline-grid">
+          {CONFIG_FIELDS.map((field) => (
+            <div key={field.key} className="baseline-field">
+              <label className="form-label" htmlFor={`baseline-${field.key}`}>
+                {field.label}
+              </label>
+              <input
+                id={`baseline-${field.key}`}
+                className="control-input"
+                type="number"
+                min={1}
+                value={draft[field.key] ?? ''}
+                disabled={!isAdmin}
+                onChange={(e) =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    [field.key]: e.target.value === '' ? undefined : Number(e.target.value),
+                  }))
+                }
+              />
+              <span className="form-hint">{field.hint}</span>
+            </div>
+          ))}
+        </div>
         {isAdmin && (
-          <button
-            type="button"
-            className="control-chip"
-            style={{ alignSelf: 'flex-end' }}
-            onClick={() => saveConfig.mutate(draft)}
-            disabled={saveConfig.isPending}
-          >
-            Save settings
-          </button>
+          <div className="sentinel-controls">
+            <button
+              type="button"
+              className="control-chip control-chip--primary"
+              onClick={() => saveConfig.mutate(draft)}
+              disabled={saveConfig.isPending}
+            >
+              Save settings
+            </button>
+          </div>
         )}
-      </div>
+      </article>
 
-      <div
-        className="controls-row"
-        style={{ flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}
-      >
-        <button
-          type="button"
-          className="control-chip"
-          onClick={() => setFilter('all')}
-          style={
-            filter === 'all'
-              ? { borderColor: 'var(--color-accent)', color: 'var(--color-accent)' }
-              : undefined
-          }
-        >
-          All
-        </button>
-        {(Object.keys(CATEGORY_META) as DeviceCategory[]).map((cat) => (
+      <article className="config-card">
+        <div className="panel__header">
+          <h2 className="panel__title">Classified devices</h2>
+          <input
+            className="control-input baseline-search"
+            placeholder="Search MAC, vendor, name…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="baseline-filter">
           <button
-            key={cat}
             type="button"
             className="control-chip"
-            onClick={() => setFilter(cat)}
+            onClick={() => setFilter('all')}
             style={
-              filter === cat
-                ? { borderColor: CATEGORY_META[cat].color, color: CATEGORY_META[cat].color }
+              filter === 'all'
+                ? { borderColor: 'var(--color-accent)', color: 'var(--color-accent)' }
                 : undefined
             }
           >
-            {CATEGORY_META[cat].label} ({counts[cat] ?? 0})
+            All ({total})
           </button>
-        ))}
-        <input
-          className="control-input"
-          placeholder="Search MAC, vendor, name…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ marginLeft: 'auto' }}
-        />
-      </div>
-
-      {isLoading && (devices ?? []).length === 0 && (
-        <div className="empty-state">Loading device index…</div>
-      )}
-      {isError && (devices ?? []).length === 0 && (
-        <div className="empty-state">Failed to load device index.</div>
-      )}
-      {!isLoading && !isError && visible.length === 0 && (
-        <div className="empty-state">No devices in this category yet.</div>
-      )}
-
-      {visible.length > 0 && (
-        <div className="inventory-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Category</th>
-                <th>MAC</th>
-                <th>Vendor</th>
-                <th>Hits</th>
-                <th>RSSI</th>
-                <th>Nodes</th>
-                <th>First Seen</th>
-                <th>Last Seen</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((d) => (
-                <tr key={d.mac}>
-                  <td style={{ fontWeight: 600 }}>{d.smartName ?? '—'}</td>
-                  <td>{categoryBadge(d.category)}</td>
-                  <td style={{ fontFamily: 'monospace', fontSize: '0.85em' }}>{d.mac}</td>
-                  <td>{d.vendor ?? <span style={{ color: 'var(--color-text-muted)' }}>—</span>}</td>
-                  <td>{d.hits}</td>
-                  <td>
-                    {d.maxRssi != null ? (
-                      <span style={{ color: rssiColor(d.maxRssi) }}>{d.maxRssi}</span>
-                    ) : (
-                      '—'
-                    )}
-                    {d.minRssi != null && d.maxRssi != null && (
-                      <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8em' }}>
-                        {' '}
-                        ({d.minRssi}/{d.maxRssi})
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ fontSize: '0.8em', color: 'var(--color-text-muted)' }}>
-                    {d.nodeIds.length > 0 ? d.nodeIds.join(', ') : '—'}
-                  </td>
-                  <td style={{ fontSize: '0.85em' }}>{formatTime(d.firstSeen)}</td>
-                  <td style={{ fontSize: '0.85em' }}>{formatTime(d.lastSeen)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {(Object.keys(CATEGORY_META) as DeviceCategory[]).map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              className="control-chip"
+              title={CATEGORY_META[cat].blurb}
+              onClick={() => setFilter(cat)}
+              style={
+                filter === cat
+                  ? { borderColor: CATEGORY_META[cat].color, color: CATEGORY_META[cat].color }
+                  : undefined
+              }
+            >
+              <span className="baseline-cat-dot" style={{ background: CATEGORY_META[cat].color }} />
+              {CATEGORY_META[cat].label} ({counts[cat] ?? 0})
+            </button>
+          ))}
         </div>
-      )}
-    </section>
+
+        <p className="form-hint baseline-legend">
+          {(Object.keys(CATEGORY_META) as DeviceCategory[])
+            .map((cat) => `${CATEGORY_META[cat].label} — ${CATEGORY_META[cat].blurb}`)
+            .join(' · ')}
+        </p>
+
+        {isLoading && total === 0 && <div className="empty-state">Loading device index…</div>}
+        {isError && total === 0 && (
+          <div className="empty-state">Failed to load the device index.</div>
+        )}
+        {!isLoading && !isError && visible.length === 0 && (
+          <div className="empty-state">
+            {total === 0
+              ? 'No devices yet — they appear here as your nodes report probe hits and detections.'
+              : 'No devices in this category.'}
+          </div>
+        )}
+
+        {visible.length > 0 && (
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Category</th>
+                  <th>MAC</th>
+                  <th>Vendor</th>
+                  <th>Hits</th>
+                  <th>RSSI</th>
+                  <th>Nodes</th>
+                  <th>First seen</th>
+                  <th>Last seen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((d) => (
+                  <tr key={d.mac}>
+                    <td style={{ fontWeight: 600 }}>{d.smartName ?? '—'}</td>
+                    <td>{categoryBadge(d.category)}</td>
+                    <td style={{ fontFamily: 'monospace', fontSize: '0.85em' }}>{d.mac}</td>
+                    <td>
+                      {d.vendor ?? <span style={{ color: 'var(--color-text-muted)' }}>—</span>}
+                    </td>
+                    <td>{d.hits}</td>
+                    <td>
+                      {d.maxRssi != null ? (
+                        <span style={{ color: rssiColor(d.maxRssi) }}>{d.maxRssi}</span>
+                      ) : (
+                        '—'
+                      )}
+                      {d.minRssi != null && d.maxRssi != null && (
+                        <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8em' }}>
+                          {' '}
+                          ({d.minRssi}/{d.maxRssi})
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ fontSize: '0.8em', color: 'var(--color-text-muted)' }}>
+                      {d.nodeIds.length > 0 ? d.nodeIds.join(', ') : '—'}
+                    </td>
+                    <td style={{ fontSize: '0.85em' }}>{formatTime(d.firstSeen)}</td>
+                    <td style={{ fontSize: '0.85em' }}>{formatTime(d.lastSeen)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </article>
+    </div>
   );
 }

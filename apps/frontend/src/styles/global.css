@@ -604,12 +604,12 @@ body.theme-dark .control-chip[disabled] {
   background: rgba(var(--color-accent-rgb), 0.18);
 }
 .geofence-card__actions button.danger {
-  background: rgba(239, 68, 68, 0.16);
-  border-color: rgba(239, 68, 68, 0.4);
-  color: #ef4444;
+  background: transparent;
+  border-color: rgba(249, 115, 22, 0.5);
+  color: var(--alert-color-alert);
 }
 .geofence-card__actions button.danger:hover {
-  background: rgba(239, 68, 68, 0.25);
+  background: rgba(249, 115, 22, 0.14);
 }
 .geofence-header__actions {
   display: flex;
@@ -744,12 +744,12 @@ body.theme-dark .control-chip[disabled] {
   background: rgba(var(--color-accent-rgb), 0.15);
 }
 .geofence-table__actions .danger {
-  background: rgba(239, 68, 68, 0.16);
-  border-color: rgba(239, 68, 68, 0.35);
-  color: #ef4444;
+  background: transparent;
+  border-color: rgba(249, 115, 22, 0.5);
+  color: var(--alert-color-alert);
 }
 .geofence-table__actions .danger:hover {
-  background: rgba(239, 68, 68, 0.25);
+  background: rgba(249, 115, 22, 0.14);
 }
 .geofence-table .table-sort {
   border: none;
@@ -2110,14 +2110,14 @@ body.theme-dark .control-chip[disabled] {
   background: rgba(var(--color-accent-rgb), 0.9);
 }
 .template-card__actions .template-delete {
-  background: #ef4444;
-  border-color: #dc2626;
-  color: #ffffff;
+  background: transparent;
+  border-color: rgba(249, 115, 22, 0.5);
+  color: var(--alert-color-alert);
   padding: 0.35rem 0.7rem;
   border-radius: 0.55rem;
 }
 .template-card__actions .template-delete:hover {
-  background: #dc2626;
+  background: rgba(249, 115, 22, 0.14);
 }
 .template-card__actions .template-card__delete {
   margin-left: auto;
@@ -2668,12 +2668,13 @@ body.theme-dark .control-chip[disabled] {
   text-decoration: underline;
 }
 .control-chip--danger {
-  color: #ef4444;
-  border-color: #ef4444;
+  background: transparent;
+  color: var(--alert-color-alert);
+  border-color: rgba(249, 115, 22, 0.5);
 }
 .control-chip--danger:is(:hover, :focus-visible) {
-  background: #ef4444;
-  color: #ffffff;
+  background: rgba(249, 115, 22, 0.14);
+  color: var(--alert-color-alert);
 }
 
 @media (max-width: 1366px) {
@@ -2779,7 +2780,7 @@ body.theme-dark .control-chip[disabled] {
 }
 @media (max-width: 1180px) {
   .app-content {
-    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-columns: 76px minmax(0, 1fr);
     grid-template-rows: auto 320px;
   }
   .terminal-drawer {
@@ -3197,8 +3198,9 @@ body.theme-dark .control-chip[disabled] {
   cursor: pointer;
 }
 .scheduler-event__actions button:last-child {
-  border-color: #dc2626;
-  background: #ef4444;
+  border-color: rgba(249, 115, 22, 0.5);
+  background: transparent;
+  color: var(--alert-color-alert);
 }
 .scheduler-dialog {
   position: fixed;
@@ -5839,14 +5841,14 @@ body.theme-dark .strategy-table__row--selected {
 }
 
 .battery-saver-dialog__btn--stop {
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
-  border-color: rgba(239, 68, 68, 0.3);
+  background: transparent;
+  color: var(--alert-color-alert);
+  border-color: rgba(249, 115, 22, 0.5);
 }
 
 .battery-saver-dialog__btn--stop:hover:not(:disabled) {
-  background: #ef4444;
-  color: white;
+  background: rgba(249, 115, 22, 0.14);
+  color: var(--alert-color-alert);
 }
 
 .battery-saver-dialog__btn--status {
@@ -6053,4 +6055,51 @@ body.theme-dark .strategy-table__row--selected {
   color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+/* Baseline classification page */
+.baseline-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 1rem;
+  margin: 0.35rem 0 0.9rem;
+}
+.baseline-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.baseline-field .control-input {
+  width: 100%;
+}
+.baseline-field .form-hint {
+  line-height: 1.3;
+}
+.baseline-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.9rem;
+}
+.baseline-search {
+  min-width: 240px;
+  max-width: 320px;
+}
+@media (max-width: 640px) {
+  .baseline-search {
+    width: 100%;
+    max-width: none;
+  }
+}
+.baseline-cat-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 0.4rem;
+  vertical-align: baseline;
+}
+.baseline-legend {
+  margin-top: 0.6rem;
 }
