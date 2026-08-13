@@ -30,6 +30,8 @@ const DRONE_REGEX =
 
 const ANOMALY_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*ANOMALY-(?<kind>NEW|RETURN|RSSI):\s*(?<type>\w+)\s+(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})(?:\s+RSSI:(?<rssi>-?\d+))?(?:\s+Old:(?<old>-?\d+)\s+New:(?<new>-?\d+)\s+Delta:(?<delta>-?\d+))?(?:\s+Name:(?<name>[^ ]+))?/i;
+const BASELINE_ANOMALY_REGEX =
+  /^(?<id>[A-Za-z0-9_.:-]+):\s*ANOMALY:\s*(?<type>WiFi|BLE)\s+(?<mac>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})(?:\s+RSSI:(?<rssi>-?\d+))?(?:\s+(?<rest>.+))?$/i;
 
 const ATTACK_LONG_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*ATTACK:\s*(?<kind>DEAUTH|DISASSOC)(?:\s+\[(?<mode>BROADCAST|TARGETED)\])?\s+SRC:(?<src>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+DST:(?<dst>(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})\s+RSSI:(?<rssi>-?\d+)d?Bm?\s+CH:(?<chan>\d+)/i;
@@ -426,27 +428,61 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
     raw: string,
   ): SerialParseResult[] | null {
     const m = ANOMALY_REGEX.exec(payload);
-    if (!m?.groups) return null;
-    return [
-      {
-        kind: 'alert',
-        level: 'NOTICE',
-        category: 'anomaly',
-        nodeId: nodeId ?? m.groups.id,
-        message: payload,
-        data: {
-          kind: m.groups.kind,
-          type: m.groups.type,
-          mac: m.groups.mac.toUpperCase(),
-          rssi: m.groups.rssi ? Number(m.groups.rssi) : undefined,
-          old: m.groups.old ? Number(m.groups.old) : undefined,
-          new: m.groups.new ? Number(m.groups.new) : undefined,
-          delta: m.groups.delta ? Number(m.groups.delta) : undefined,
-          name: m.groups.name,
+    if (m?.groups) {
+      return [
+        {
+          kind: 'alert',
+          level: 'NOTICE',
+          category: 'anomaly',
+          nodeId: nodeId ?? m.groups.id,
+          message: payload,
+          data: {
+            kind: m.groups.kind,
+            type: m.groups.type,
+            mac: m.groups.mac.toUpperCase(),
+            rssi: m.groups.rssi ? Number(m.groups.rssi) : undefined,
+            old: m.groups.old ? Number(m.groups.old) : undefined,
+            new: m.groups.new ? Number(m.groups.new) : undefined,
+            delta: m.groups.delta ? Number(m.groups.delta) : undefined,
+            name: m.groups.name,
+          },
+          raw,
         },
-        raw,
-      },
-    ];
+      ];
+    }
+    const g = BASELINE_ANOMALY_REGEX.exec(payload);
+    if (g?.groups) {
+      const rest = g.groups.rest?.trim() ?? '';
+      const nameMatch = /\sN:(.+)$/.exec(rest);
+      const name = nameMatch ? nameMatch[1].trim() : undefined;
+      const reason = (nameMatch ? rest.slice(0, nameMatch.index) : rest).trim() || undefined;
+      const kind = /^new\b/i.test(rest)
+        ? 'NEW'
+        : /^device returned/i.test(rest)
+          ? 'RETURN'
+          : /rssi change/i.test(rest)
+            ? 'RSSI'
+            : undefined;
+      return [
+        {
+          kind: 'alert',
+          level: 'NOTICE',
+          category: 'anomaly',
+          nodeId: nodeId ?? g.groups.id,
+          message: payload,
+          data: {
+            kind,
+            type: g.groups.type,
+            mac: g.groups.mac.toUpperCase(),
+            rssi: g.groups.rssi ? Number(g.groups.rssi) : undefined,
+            reason,
+            name,
+          },
+          raw,
+        },
+      ];
+    }
+    return null;
   }
 
   private parseAttack(
