@@ -164,7 +164,7 @@ Audit node health, connectivity, and telemetry history with quick map focus acti
 
 #### Sentinel
 
-<img width="1053" height="910" alt="image" src="https://github.com/user-attachments/assets/3dcc3cae-88e0-4e47-8285-4938d73f80b4" />
+<img width="1019" height="989" alt="4D4ABE5C-6F17-4131-A4E1-82453C8F02B8_1_201_a" src="https://github.com/user-attachments/assets/03356022-3a33-4bf8-b389-17e7fd8fc0bc" />
 
 
 Arm the WiFi attack detection tool. Detector families (DoS, Rogue AP, Recon, Physical, Mesh Guard)
