@@ -177,6 +177,10 @@ export class UpdateGitService {
       USER: process.env.USER,
       LANG: process.env.LANG || 'en_US.UTF-8',
       LC_ALL: process.env.LC_ALL || 'en_US.UTF-8',
+      GIT_TERMINAL_PROMPT: '0',
+      GIT_ASKPASS: '',
+      SSH_ASKPASS: '',
+      GCM_INTERACTIVE: 'never',
     };
 
     if (process.platform === 'win32') {
