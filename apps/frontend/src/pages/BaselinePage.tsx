@@ -236,7 +236,7 @@ export function BaselinePage() {
 
       <article className="config-card">
         <div className="panel__header">
-          <h2 className="panel__title">Firmware baseline detector</h2>
+          <h2 className="panel__title">Anomaly Detection &amp; Classification</h2>
           {statusRows.length > 0 && (
             <span className="status-pill">
               {statusRows.filter((s) => s.scanning).length} scanning /{' '}
