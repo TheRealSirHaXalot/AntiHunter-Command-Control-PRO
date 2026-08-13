@@ -140,6 +140,22 @@ Review discovered devices, signal strength history, vendor resolutions, and expo
 
 ![Inventory view listing detected devices](images/InventoryFilled.png)
 
+#### Baseline
+
+Classifies every indexed device by its presence pattern over a configurable window and assigns a smart name per class. Each device sighting (probe hit or target detection) is sessionized into visits separated by a gap threshold; a periodic classifier then labels devices:
+
+- **Stationary** — present for at least the configured percent of the window (persistent, low churn).
+- **Frequent Flier** — visit count in the window meets or exceeds the configured threshold (comes and goes).
+- **Visitor** — first seen after the baseline was established, then absent past the departure threshold and did not return.
+- **New** — first seen after the baseline was established and still present.
+- **Transient** — none of the above.
+
+Operators set the baseline start ("Establish baseline"), the rolling window, the visit-gap threshold, the frequent-flier visit count, the visitor-absence threshold, the stationary presence percent, and the auto-classify interval from the page. "Classify now" runs the classifier on demand; classification also runs on the auto interval. Admin controls: establish/reset baseline, save settings, clear the index.
+
+Changing the visit-gap threshold applies to future sightings only; it does not re-sessionize past visits.
+
+REST: `GET /device-classification` (indexed devices), `GET /device-classification/config`, `PUT /device-classification/config`, `POST /device-classification/classify`, `POST /device-classification/baseline` (establish), `DELETE /device-classification/baseline` (reset), `DELETE /device-classification` (clear).
+
 #### Targets
 
 Promote detections to tracked targets, view triangulation results, and manage status notes.

@@ -911,3 +911,52 @@ model UpdateLog {
   @@index([status, startedAt])
   @@index([triggeredById])
 }
+
+model DeviceBaselineConfig {
+  id                    String    @id @default(cuid())
+  baselineStart         DateTime?
+  rollingWindowMinutes  Int       @default(1440)
+  gapThresholdMinutes   Int       @default(30)
+  frequentFlierVisits   Int       @default(3)
+  visitorAbsenceMinutes Int       @default(120)
+  stationaryPresencePct Int       @default(70)
+  autoClassifyMinutes   Int       @default(5)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model DevicePresence {
+  mac            String    @id
+  siteId         String?
+  vendor         String?
+  firstSeen      DateTime  @default(now())
+  lastSeen       DateTime
+  hits           Int       @default(0)
+  minRssi        Int?
+  maxRssi        Int?
+  nodeIds        String[]  @default([])
+  currentVisitId String?
+  category       String?
+  smartName      String?
+  classifiedAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([siteId])
+  @@index([category])
+  @@index([lastSeen])
+}
+
+model DeviceVisit {
+  id        String   @id @default(cuid())
+  mac       String
+  siteId    String?
+  start     DateTime @default(now())
+  end       DateTime
+  hits      Int      @default(1)
+  nodeId    String?
+
+  @@index([mac])
+  @@index([start])
+  @@index([mac, start])
+}

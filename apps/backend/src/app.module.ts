@@ -12,6 +12,7 @@ import { ChatModule } from './chat/chat.module';
 import { CommandsModule } from './commands/commands.module';
 import configuration from './config/configuration';
 import { validateEnvironment } from './config/environment.validation';
+import { DeviceClassificationModule } from './device-classification/device-classification.module';
 import { DronesModule } from './drones/drones.module';
 import { EventsModule } from './events/events.module';
 import { ExportsModule } from './exports/exports.module';
@@ -103,6 +104,7 @@ import { WsModule } from './ws/ws.module';
     WebhooksModule,
     UpdateModule,
     ProbeInventoryModule,
+    DeviceClassificationModule,
   ],
 })
 export class AppModule implements NestModule {
