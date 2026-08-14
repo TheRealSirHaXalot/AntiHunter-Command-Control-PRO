@@ -46,8 +46,8 @@ RUN pnpm install --frozen-lockfile --prod --filter @command-center/backend...
 # Copy the generated Prisma client from the builder stage
 COPY --from=builder /app/node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/.prisma /app/node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/.prisma
 
-# Provide udevadm for serialport enumeration inside the container
-RUN apt-get update  && apt-get install -y --no-install-recommends udev  && rm -rf /var/lib/apt/lists/*
+# Provide udevadm and git inside the container
+RUN apt-get update  && apt-get install -y --no-install-recommends udev git  && rm -rf /var/lib/apt/lists/*
 
 # Copy backend artefacts
 COPY --from=builder /app/apps/backend ./apps/backend

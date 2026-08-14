@@ -6,6 +6,9 @@ if [ -n "${BASH:-}" ]; then
   set -o pipefail
 fi
 
+# Ensure git considers /app safe regardless of mounted volume ownership
+git config --global --add safe.directory /app || true
+
 cd /app/apps/backend
 
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
