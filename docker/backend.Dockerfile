@@ -43,8 +43,8 @@ COPY --from=builder /app/apps/backend/package.json ./apps/backend/package.json
 # Install production dependencies only for @command-center/backend
 RUN pnpm install --frozen-lockfile --prod --filter @command-center/backend...
 
-# Generate Prisma client for runtime environment
-RUN pnpm --filter @command-center/backend prisma:generate
+# Copy the generated Prisma client from the builder stage
+COPY --from=builder /app/node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/.prisma /app/node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/.prisma
 
 # Provide udevadm for serialport enumeration inside the container
 RUN apt-get update  && apt-get install -y --no-install-recommends udev  && rm -rf /var/lib/apt/lists/*
