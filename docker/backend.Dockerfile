@@ -54,7 +54,7 @@ COPY --from=builder /app/apps/backend ./apps/backend
 
 # Lightweight entrypoint handles migrations before boot
 COPY docker/backend-entrypoint.sh ./backend-entrypoint.sh
-RUN chmod +x ./backend-entrypoint.sh
+RUN sed -i 's/\r$//' ./backend-entrypoint.sh && chmod +x ./backend-entrypoint.sh
 
 EXPOSE 3000
 
