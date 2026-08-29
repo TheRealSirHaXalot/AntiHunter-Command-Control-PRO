@@ -843,13 +843,12 @@ Frontend currently consumes backend settings via API, so no extra `.env` is need
 
 ### Environment file layout
 
-The backend resolves `process.env` in this order:
+The backend loads two env files via `ConfigModule` `envFilePath`, resolved relative to the compiled module (same paths in dev and prod), in precedence order:
 
-1. **Repository root `.env`** – global defaults shared by the workspace (useful for local development).
-2. **`apps/backend/.env`** – overrides that apply only to the NestJS service (preferred place for backend secrets when running `pnpm dev`).
-3. **`apps/backend/prisma/.env`** – read exclusively by Prisma CLI utilities (migrations, `prisma studio`, seed scripts). This file normally only contains `DATABASE_URL` so migrations can run without loading the full backend environment.
+1. **`apps/backend/.env`** – wins on conflicts; put backend and `SERIAL_*` overrides here.
+2. **Repository root `.env`** – base defaults shared across the workspace (e.g. `SITE_ID`, `DATABASE_URL`).
 
-The files are optional; supply whichever ones make sense for your deployment model (for Docker/Kubernetes you can mount an external env file instead). When values are duplicated, the later file in the list wins.
+A key set in `apps/backend/.env` overrides the same key in the root `.env`; keys only in the root `.env` still load. `apps/backend/prisma/.env` is read only by the Prisma CLI (`DATABASE_URL` for migrations/seed). Container deployments pass variables directly (see `docker/.env.example`).
 
 ### Serial defaults & persistence
 
