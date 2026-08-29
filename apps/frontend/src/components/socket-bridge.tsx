@@ -1006,7 +1006,10 @@ function parseEventPayload(
 
     if (base.type === 'command.result') {
       return {
-        message: base.message ?? `Command result from ${base.nodeId ?? 'node'}`,
+        message:
+          base.message ??
+          (base as { payload?: string }).payload ??
+          `Command result from ${base.nodeId ?? 'node'}`,
         level: 'notice',
         source: 'command',
         timestamp: typeof base.timestamp === 'string' ? base.timestamp : undefined,

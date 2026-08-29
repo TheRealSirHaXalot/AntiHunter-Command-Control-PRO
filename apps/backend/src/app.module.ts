@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
+import { join } from 'node:path';
 
 import { AcarsModule } from './acars/acars.module';
 import { AdsbModule } from './adsb/adsb.module';
@@ -43,6 +44,7 @@ import { WsModule } from './ws/ws.module';
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
+      envFilePath: [join(__dirname, '..', '.env'), join(__dirname, '..', '..', '..', '.env')],
       load: [configuration],
       validate: validateEnvironment,
       expandVariables: true,
