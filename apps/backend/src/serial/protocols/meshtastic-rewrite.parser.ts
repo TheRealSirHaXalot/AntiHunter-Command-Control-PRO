@@ -104,7 +104,7 @@ const SENTINEL_FIELD_SCHEMAS: Record<string, string[]> = {
   PMKID_FORGE: ['src', 'tag', 'rssi'],
   PMKID_HARVEST: ['bssid', 'sta', 'rssi'],
   HSHK: ['bssid', 'sta', 'msgNum', 'replayCtr', 'rssi'],
-  EVILTWIN: ['bssid', 'reason', 'rssi'],
+  EVILTWIN: ['bssid', 'reason', 'rssi', 'ssid'],
   OWE_ABUSE: ['bssid', 'ssid', 'rssi'],
   BEACON_FLOOD: ['count'],
   BEACON_FORGE: ['bssid', 'reason', 'rssi'],
