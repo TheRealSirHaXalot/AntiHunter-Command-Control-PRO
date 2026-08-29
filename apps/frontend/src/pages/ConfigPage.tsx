@@ -492,7 +492,7 @@ export function ConfigPage() {
       }
     };
 
-    socket.on('event', (event: { type: string; data: unknown }) => {
+    const handleConfigEvent = (event: { type: string; data: unknown }) => {
       if (event.type === 'update.progress') {
         handleUpdateProgress(
           event as { data: { phase: string; message: string; progress: number } },
@@ -500,10 +500,11 @@ export function ConfigPage() {
       } else if (event.type === 'update.complete') {
         handleUpdateComplete(event as { data: { success: boolean; error?: string } });
       }
-    });
+    };
+    socket.on('event', handleConfigEvent);
 
     return () => {
-      socket.off('event');
+      socket.off('event', handleConfigEvent);
     };
   }, [socket, isAdmin, queryClient]);
 
