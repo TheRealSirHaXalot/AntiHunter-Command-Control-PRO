@@ -2,8 +2,10 @@
 .git
 .gitignore
 node_modules
+**/node_modules
 logs
 dist
+**/dist
 coverage
 tmp
 .DS_Store

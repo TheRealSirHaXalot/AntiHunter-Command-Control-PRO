@@ -43,18 +43,18 @@ COPY --from=builder /app/apps/backend/package.json ./apps/backend/package.json
 # Install production dependencies only for @command-center/backend
 RUN pnpm install --frozen-lockfile --prod --filter @command-center/backend...
 
-# Copy the generated Prisma client from the builder stage
-COPY --from=builder /app/node_modules/.prisma /app/node_modules/.prisma
+# Regenerate the Prisma client against the prod-installed @prisma/client
+RUN cd apps/backend && npx --yes prisma@5.22.0 generate
 
-# Provide udevadm for serialport enumeration inside the container
-RUN apt-get update  && apt-get install -y --no-install-recommends udev  && rm -rf /var/lib/apt/lists/*
+# Provide udevadm and git inside the container
+RUN apt-get update  && apt-get install -y --no-install-recommends udev git  && rm -rf /var/lib/apt/lists/*
 
 # Copy backend artefacts
 COPY --from=builder /app/apps/backend ./apps/backend
 
 # Lightweight entrypoint handles migrations before boot
 COPY docker/backend-entrypoint.sh ./backend-entrypoint.sh
-RUN chmod +x ./backend-entrypoint.sh
+RUN sed -i 's/\r$//' ./backend-entrypoint.sh && chmod +x ./backend-entrypoint.sh
 
 EXPOSE 3000
 

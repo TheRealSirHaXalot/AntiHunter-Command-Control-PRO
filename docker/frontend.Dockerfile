@@ -9,6 +9,7 @@ RUN corepack enable
 RUN corepack prepare pnpm@9.9.0 --activate
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY apps/backend/package.json apps/backend/
 COPY apps/frontend/package.json apps/frontend/
 
 RUN pnpm install --frozen-lockfile
