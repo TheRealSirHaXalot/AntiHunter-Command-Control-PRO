@@ -40,6 +40,15 @@ export const DEFAULT_TEMPLATES: CommandTemplate[] = [
     builtIn: true,
   },
   {
+    id: 'tmpl-pcap-wifi-5m',
+    label: 'Packet Capture - WiFi 5 min',
+    commandName: 'PCAP_START',
+    target: '@ALL',
+    params: ['0', '300', '0'],
+    description: 'Record five minutes of 2.4 GHz WiFi traffic to the node SD card.',
+    builtIn: true,
+  },
+  {
     id: 'tmpl-baseline-5m',
     label: 'Baseline - 5 min',
     commandName: 'BASELINE_START',
