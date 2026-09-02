@@ -58,6 +58,7 @@ AntiHunter Command & Control PRO turns raw radio/mesh telemetry into actionable 
 - **Scanning workflows**: Command presets fire scan/baseline/deauth/randomization pipelines against nodes, with FOREVER protections and audit trails. Operators can schedule sweeps, chain commands, and monitor acknowledgements/results inside the console.
 - **Tracking**: Every detection updates the live map with trails, heading vectors, RSSI pulses, and site-specific coloration. Inventory rows store the location history so you can pivot from console <-> map <-> export seamlessly.
 - **Triangulation**: Multi-node detection events feed the triangulation engine, capturing angle-of-arrival data set by the nodes. Results surface in the Targets module with exports for external tooling (e.g., CSV/GeoJSON) and can be reviewed in the map view as overlays.
+- **Packet capture**: `PCAP_START:<radio>:<secs>[:<band>][:FOREVER]` and `PCAP_STOP` start and stop a pcap recording on the node's SD card. Radio 0 WiFi, 1 BLE; band 0 2.4 GHz, 1 5 GHz, 2 both, 5 GHz on C5 nodes only. The Console tracks the `PCAP_ACK` and `PCAP_DONE` frames; the file itself stays on the node and is retrieved from its web UI, not over mesh.
 - **Exports & auditing**: Scan logs, triangulation snapshots, and detection histories are exportable from their respective modules, ensuring mission reporting and post-op analysis are one click away.
 
 ### Drone Awareness & FAA Enhancements

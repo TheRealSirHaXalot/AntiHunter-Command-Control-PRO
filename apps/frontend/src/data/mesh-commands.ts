@@ -420,6 +420,59 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     parameters: [],
   },
   {
+    name: 'PCAP_START',
+    group: 'Scanning',
+    description:
+      'Record raw traffic to the node SD card as a pcap. Retrieve the file from the node web UI; it is not transferred over mesh.',
+    defaultTarget: '@ALL',
+    parameters: [
+      {
+        key: 'radio',
+        label: 'Radio',
+        type: 'select',
+        options: [
+          { label: '0 - WiFi', value: '0' },
+          { label: '1 - BLE', value: '1' },
+        ],
+        required: true,
+      },
+      {
+        key: 'duration',
+        label: 'Duration (seconds)',
+        type: 'duration',
+        placeholder: '300',
+        required: true,
+        min: 1,
+        max: 86400,
+        suffix: 'sec',
+      },
+      {
+        key: 'band',
+        label: 'Band (C5 only)',
+        type: 'select',
+        options: [
+          { label: '0 - 2.4 GHz', value: '0' },
+          { label: '1 - 5 GHz', value: '1' },
+          { label: '2 - Both', value: '2' },
+        ],
+      },
+    ],
+    allowForever: true,
+    examples: [
+      { target: '@ALL', params: ['0', '300', '0'] },
+      { target: '@NODE_22', params: ['1', '600'] },
+      { target: '@ALL', params: ['0', '300', '2', 'FOREVER'] },
+    ],
+  },
+  {
+    name: 'PCAP_STOP',
+    group: 'Scanning',
+    description: 'Stop the running packet capture and close the file.',
+    defaultTarget: '@ALL',
+    parameters: [],
+    examples: [{ target: '@ALL', params: [] }],
+  },
+  {
     name: 'TRIANGULATE_START',
     group: 'Triangulation',
     description: 'Initiate triangulation for MAC or identity (T-xxx).',

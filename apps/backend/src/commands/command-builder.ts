@@ -58,6 +58,8 @@ const COMMAND_HANDLERS = new Map<string, CommandHandler>([
   ['HB_INTERVAL', handleHbInterval],
   ['PROBE_START', handleProbeStart],
   ['PROBE_STOP', expectNoParams],
+  ['PCAP_START', handlePcapStart],
+  ['PCAP_STOP', expectNoParams],
   ['TRIANGULATE_START', handleTriangulateStart],
   ['TRIANGULATE_STOP', expectNoParams],
   ['TRIANGULATE_RESULTS', expectNoParams],
@@ -243,6 +245,34 @@ function handleTimedCommand(params: string[]): string[] {
   const output = [duration];
   if (params.length === 2) {
     output.push(normalizeForever(params[1]));
+  }
+  return output;
+}
+
+function handlePcapStart(params: string[]): string[] {
+  if (params.length < 2 || params.length > 4) {
+    throw new BadRequestException(
+      'PCAP_START expects radio, duration (seconds), optional band, and optional FOREVER token.',
+    );
+  }
+  const radio = params[0].trim();
+  if (!['0', '1'].includes(radio)) {
+    throw new BadRequestException('Radio must be 0 (WiFi) or 1 (BLE).');
+  }
+  const duration = normalizeDuration(params[1]);
+  const output = [radio, duration];
+  for (let i = 2; i < params.length; i += 1) {
+    const token = params[i].trim().toUpperCase();
+    if (token === 'FOREVER') {
+      output.push(token);
+      continue;
+    }
+    if (!['0', '1', '2'].includes(token)) {
+      throw new BadRequestException(
+        `Invalid PCAP_START token: ${params[i]}. Expected band 0, 1, 2 or FOREVER.`,
+      );
+    }
+    output.push(token);
   }
   return output;
 }
