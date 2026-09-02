@@ -2,7 +2,9 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { TakProtocol } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import * as dgram from 'dgram';
+import { readFileSync } from 'fs';
 import * as net from 'net';
+import * as tls from 'tls';
 
 import { TakConfigService, TakConfig } from './tak-config.service';
 import { buildCotEvent } from './utils/cot-builder';
@@ -477,12 +479,20 @@ export class TakService implements OnModuleInit, OnModuleDestroy {
       let settled = false;
       const tcpHost = config.host ?? '127.0.0.1';
       const tcpPort = config.port ?? 0;
-      const socket = net.connect({ host: tcpHost, port: tcpPort }, async () => {
-        this.logger.log(`Connected to TAK TCP ${config.host}:${config.port}`);
+      const onConnect = async () => {
+        this.logger.log(
+          `Connected to TAK ${config.tlsEnabled ? 'TLS' : 'TCP'} ${config.host}:${config.port}`,
+        );
         await this.takConfigService.updateLastConnected(new Date());
         settled = true;
         resolve(undefined);
-      });
+      };
+      const socket = config.tlsEnabled
+        ? tls.connect(
+            { host: tcpHost, port: tcpPort, ...this.buildTakTlsOptions(config) },
+            onConnect,
+          )
+        : net.connect({ host: tcpHost, port: tcpPort }, onConnect);
 
       this.tcpSocket = socket;
 
@@ -509,6 +519,46 @@ export class TakService implements OnModuleInit, OnModuleDestroy {
         }
       });
     });
+  }
+
+  private buildTakTlsOptions(config: TakConfig): tls.ConnectionOptions {
+    const insecure = process.env.TAK_TLS_INSECURE === 'true';
+    if (insecure) {
+      this.logger.warn(
+        'TAK_TLS_INSECURE=true: TAK server certificate verification disabled (insecure, MITM possible).',
+      );
+    }
+    const options: tls.ConnectionOptions = { rejectUnauthorized: !insecure };
+    const ca = this.loadTakPem(config.cafile);
+    const cert = this.loadTakPem(config.certfile);
+    const key = this.loadTakPem(config.keyfile);
+    if (ca) {
+      options.ca = ca;
+    }
+    if (cert) {
+      options.cert = cert;
+    }
+    if (key) {
+      options.key = key;
+    }
+    return options;
+  }
+
+  private loadTakPem(value?: string | null): string | undefined {
+    if (!value) {
+      return undefined;
+    }
+    if (value.includes('-----BEGIN')) {
+      return value;
+    }
+    try {
+      return readFileSync(value, 'utf8');
+    } catch (error) {
+      this.logger.error(
+        `TAK certificate not readable at ${value}: ${error instanceof Error ? error.message : error}`,
+      );
+      return undefined;
+    }
   }
 
   private handleCotMessage(message: string): void {

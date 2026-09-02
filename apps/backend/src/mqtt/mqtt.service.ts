@@ -355,7 +355,13 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     }
 
     if (config.tlsEnabled) {
-      options.rejectUnauthorized = false;
+      const insecure = process.env.MQTT_TLS_INSECURE === 'true';
+      options.rejectUnauthorized = !insecure;
+      if (insecure) {
+        this.logger.warn(
+          'MQTT_TLS_INSECURE=true: broker certificate verification disabled (insecure, MITM possible).',
+        );
+      }
       if (config.caPem) {
         options.ca = config.caPem;
       }
