@@ -15,7 +15,7 @@ overrides:
   ajv@6: 6.14.0
   '@remix-run/router': '>=1.23.2'
   diff: '>=8.0.3'
-  undici: '>=6.27.0 <7.0.0'
+  undici: '>=6.28.1 <7.0.0'
   lodash: '>=4.18.0'
   '@isaacs/brace-expansion': '>=5.0.5'
   brace-expansion@1: 1.1.18
@@ -195,8 +195,8 @@ importers:
         specifier: ^4.8.3
         version: 4.8.3
       undici:
-        specifier: '>=6.27.0 <7.0.0'
-        version: 6.27.0
+        specifier: '>=6.28.1 <7.0.0'
+        version: 6.28.1
       zod:
         specifier: ^3.23.8
         version: 3.25.76
@@ -3977,8 +3977,8 @@ packages:
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
-  undici@6.27.0:
-    resolution: {integrity: sha512-YmfV3YnEDzXRC5lZ2jWtWWHKGUm1zIt8AhesR1tens+HTNv+YZlN/dp6G727LOvMJ8xjP9Be7Y2Sdr96LDm+pg==}
+  undici@6.28.1:
+    resolution: {integrity: sha512-zWpdTVD54H48CIybL0rWQ3ukpb9d23wM7eH5RtfdmeP70cWHNjtfo7P4vZX+5CoDcO53J4Pu5uXp7lNfjc6DRA==}
     engines: {node: '>=18.17'}
 
   universalify@2.0.1:
@@ -8171,7 +8171,7 @@ snapshots:
 
   undici-types@6.21.0: {}
 
-  undici@6.27.0: {}
+  undici@6.28.1: {}
 
   universalify@2.0.1: {}
 
