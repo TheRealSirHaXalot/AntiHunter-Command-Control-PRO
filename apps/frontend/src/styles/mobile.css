@@ -52,6 +52,8 @@
     width: 100%;
     justify-content: flex-start;
     gap: 0.2rem;
+    padding-right: 3rem;
+    box-sizing: border-box;
   }
 
   .app-header__brand-icon {
@@ -83,7 +85,7 @@
 
   .app-content {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
     padding-bottom: 1.5rem;
   }
 
@@ -104,10 +106,11 @@
     align-items: center;
     justify-content: center;
     padding: 0.4rem;
-    border: 1px solid var(--color-accent);
+    border: 2px solid #fff;
     border-radius: 0.6rem;
     background: transparent;
-    color: var(--color-accent);
+    color: #fff;
+    font-weight: 700;
   }
 
   .mobile-navbar__toggle span {
@@ -115,7 +118,7 @@
   }
 
   .mobile-navbar__toggle .nav-icon {
-    font-size: 1.4rem;
+    font-size: 1.6rem;
   }
 
   .mobile-nav-sheet {
@@ -206,19 +209,37 @@
   }
 
   .terminal-drawer {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: calc(3.8rem + env(safe-area-inset-bottom, 0));
+    display: flex;
+    position: relative;
+    grid-column: 1 / -1;
     max-height: 40vh;
     border-left: none;
     border-top: 1px solid var(--color-terminal-border);
-    z-index: 25;
-    background: rgba(8, 12, 20, 0.97);
+    z-index: 1010;
+    background: #080c14;
+    isolation: isolate;
   }
 
   .terminal-drawer__list {
     max-height: 32vh;
+  }
+
+  .terminal-drawer.terminal-drawer--collapsed {
+    width: auto;
+    background: #080c14;
+    border-top: 1px solid var(--color-terminal-border);
+  }
+
+  .terminal-drawer__edge-toggle {
+    position: static;
+    writing-mode: horizontal-tb;
+    transform: none;
+    width: 100%;
+    border: none;
+    border-bottom: 1px solid var(--color-terminal-border);
+    border-radius: 0;
+    padding: 0.6rem 1rem;
+    text-align: left;
   }
 
   .app-main {
@@ -639,20 +660,25 @@
   }
 
   .controls-row.map-controls-row {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.35rem;
-    justify-content: flex-start;
+    margin-top: 0.5rem;
   }
 
   .controls-row.map-controls-row > .control-chip {
-    flex: 0 0 auto;
-    width: auto;
+    width: 100%;
     min-width: 0;
     max-width: none;
-    min-height: 2.45rem;
-    font-size: 0.85rem;
-    padding-inline: 0.9rem;
+    justify-content: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-height: 2rem;
+    font-size: 0.78rem;
+    padding: 0.3rem 0.4rem;
+    gap: 0.3rem;
+    border-radius: 0.6rem;
+    box-shadow: none;
     white-space: nowrap;
   }
 
