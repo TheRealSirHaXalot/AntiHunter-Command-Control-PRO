@@ -97,7 +97,7 @@ function Test-DbConnect($psql, $pass) {
 }
 function Test-NodeOk {
     if (-not (Get-Command node.exe -ErrorAction SilentlyContinue)) { return $false }
-    if ([int]((& node --version) -replace 'v', '').Split('.')[0] -lt 20) { return $false }
+    if ([int]((& node --version) -replace 'v', '').Split('.')[0] -lt 22) { return $false }
     if ($wantX64 -and ((& node -p 'process.arch') -ne 'x64')) { return $false }
     return $true
 }
@@ -166,7 +166,7 @@ if (-not $SiteId) { $SiteId = 'default' }
 if (-not $SiteName) { $SiteName = $SiteId }
 if (-not $AdminPassword) { $AdminPassword = New-Password 14 }
 
-Step 1 'Node.js 20+'
+Step 1 'Node.js 22+'
 Update-SessionPath
 if (-not (Test-NodeOk)) {
     if ($wantX64 -and (Get-Command node.exe -ErrorAction SilentlyContinue)) {

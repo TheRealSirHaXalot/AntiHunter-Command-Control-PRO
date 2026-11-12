@@ -175,9 +175,9 @@ install_dependencies() {
 
         if command -v node >/dev/null 2>&1; then
             local node_version=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
-            if [[ $node_version -lt 20 ]]; then
-                error "  Node.js version is too old: v$node_version (need v20+)"
-                echo "  Solution: Install Node.js 20 or later"
+            if [[ $node_version -lt 22 ]]; then
+                error "  Node.js version is too old: v$node_version (need v22+)"
+                echo "  Solution: Install Node.js 24 LTS"
             fi
         fi
 
@@ -554,7 +554,7 @@ install_node() {
                 install_homebrew || return 1
             fi
             info "Installing Node.js via Homebrew..."
-            brew install node@20 && brew link node@20 --force --overwrite
+            brew install node@24 && brew link node@24 --force --overwrite
             ;;
         apt)
             info "Installing Node.js via apt..."
@@ -575,12 +575,12 @@ install_node() {
                         warn "ARMv6 architecture - NodeSource may not support this"
                         warn "Attempting unofficial builds as fallback..."
                         
-                        if curl -fsSL https://unofficial-builds.nodejs.org/download/release/v20.11.0/node-v20.11.0-linux-armv6l.tar.xz -o /tmp/node.tar.xz; then
+                        if curl -fsSL https://unofficial-builds.nodejs.org/download/release/v22.23.5/node-v22.23.5-linux-armv6l.tar.xz -o /tmp/node.tar.xz; then
                             sudo mkdir -p /usr/local/lib/nodejs
                             sudo tar -xJf /tmp/node.tar.xz -C /usr/local/lib/nodejs
-                            sudo ln -sf /usr/local/lib/nodejs/node-v20.11.0-linux-armv6l/bin/node /usr/local/bin/node
-                            sudo ln -sf /usr/local/lib/nodejs/node-v20.11.0-linux-armv6l/bin/npm /usr/local/bin/npm
-                            sudo ln -sf /usr/local/lib/nodejs/node-v20.11.0-linux-armv6l/bin/npx /usr/local/bin/npx
+                            sudo ln -sf /usr/local/lib/nodejs/node-v22.23.5-linux-armv6l/bin/node /usr/local/bin/node
+                            sudo ln -sf /usr/local/lib/nodejs/node-v22.23.5-linux-armv6l/bin/npm /usr/local/bin/npm
+                            sudo ln -sf /usr/local/lib/nodejs/node-v22.23.5-linux-armv6l/bin/npx /usr/local/bin/npx
                             rm /tmp/node.tar.xz
                             hash -r
                             if command -v node >/dev/null 2>&1; then
@@ -591,7 +591,7 @@ install_node() {
                     fi
                 fi
 
-                if curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -; then
+                if curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -; then
                     sudo apt-get install -y nodejs
                 else
                     error "NodeSource setup failed"
@@ -608,7 +608,7 @@ install_node() {
                     }
                 fi
             else
-                if curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -; then
+                if curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -; then
                     sudo apt-get install -y nodejs
                 else
                     error "NodeSource setup failed"
@@ -618,7 +618,7 @@ install_node() {
             ;;
         yum|dnf)
             info "Installing Node.js via $PKG_MANAGER..."
-            curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+            curl -fsSL https://rpm.nodesource.com/setup_24.x | sudo bash -
             sudo $PKG_MANAGER install -y nodejs
             ;;
         pacman)
@@ -628,12 +628,12 @@ install_node() {
         *)
             error "Cannot auto-install Node.js for your system"
             echo ""
-            echo "Please install Node.js 20+ manually:"
+            echo "Please install Node.js 24 LTS manually:"
             echo "  Website: https://nodejs.org/"
             echo ""
             if [[ "$ARCH_TYPE" == "armv6" ]] || [[ "$ARCH_TYPE" == "armv7" ]] || [[ "$ARCH_TYPE" == "arm64" ]]; then
                 echo "For ARM systems (Raspberry Pi):"
-                echo "  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -"
+                echo "  curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -"
                 echo "  sudo apt-get install -y nodejs"
                 echo ""
                 if [[ "$ARCH_TYPE" == "armv6" ]]; then
@@ -652,16 +652,16 @@ check_node() {
     if command -v node >/dev/null 2>&1; then
         local node_version
         node_version=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
-        if [[ $node_version -ge 20 ]]; then
+        if [[ $node_version -ge 22 ]]; then
             success "Node.js $(node --version) found"
             return 0
         else
-            warn "Found Node.js $node_version, but 20+ is required"
+            warn "Found Node.js $node_version, but 22+ is required"
         fi
     fi
 
-    error "Node.js 20+ not found"
-    if prompt_yes_no "Install Node.js 20 automatically?"; then
+    error "Node.js 22+ not found"
+    if prompt_yes_no "Install Node.js 24 automatically?"; then
         if install_node; then
             hash -r
             if command -v node >/dev/null 2>&1; then
@@ -682,7 +682,7 @@ check_node() {
         return 1
     else
         echo ""
-        echo "Please install Node.js 20 LTS from: https://nodejs.org/"
+        echo "Please install Node.js 24 LTS from: https://nodejs.org/"
         if prompt_yes_no "Continue setup anyway?"; then
             warn "Continuing without Node.js - you'll need to install it manually"
             return 0
@@ -737,18 +737,18 @@ check_pnpm() {
     if ! command -v node >/dev/null 2>&1; then
         warn "Node.js not found - cannot install pnpm"
         if prompt_yes_no "Continue without pnpm?"; then
-            warn "You'll need to install Node.js 20+ and pnpm manually later"
+            warn "You'll need to install Node.js 22+ and pnpm manually later"
             return 0
         fi
         return 1
     fi
     
     local node_version=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
-    if [[ $node_version -lt 20 ]]; then
-        warn "Node.js $node_version is too old for pnpm (need 20+)"
-        warn "Please install Node.js 20+ first, then run this script again"
+    if [[ $node_version -lt 22 ]]; then
+        warn "Node.js $node_version is too old (need 22+)"
+        warn "Please install Node.js 22+ first, then run this script again"
         if prompt_yes_no "Continue without pnpm?"; then
-            warn "You'll need to upgrade Node.js to 20+ and install pnpm manually"
+            warn "You'll need to upgrade Node.js to 22+ and install pnpm manually"
             return 0
         fi
         return 1

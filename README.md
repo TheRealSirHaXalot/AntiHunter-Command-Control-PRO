@@ -577,7 +577,7 @@ Install system dependencies, clone, set up PostgreSQL, then [configure](#configu
 ```bash
 sudo apt update
 sudo apt install -y curl git build-essential pkg-config libssl-dev python3 make gcc g++
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt install -y nodejs
 sudo corepack enable
 corepack prepare pnpm@latest --activate
@@ -588,7 +588,7 @@ sudo usermod -aG dialout "$USER"   # access to /dev/ttyUSB*
 
 ```bash
 xcode-select --install
-brew install node@20 pnpm git
+brew install node@24 pnpm git
 ```
 
 For serial adapters, install the USB driver (Silicon Labs CP210x: `brew install --cask silicon-labs-vcp-driver`) and reboot so `/dev/tty.SLAB_USBtoUART*` (or `/dev/tty.wchusbserial*`) appears.
@@ -987,7 +987,7 @@ Serve `apps/frontend/dist` with your preferred static host (Nginx, S3, etc.) and
 
 1. **Provision infrastructure**
    - PostgreSQL 15+ (managed or self-hosted). Create the `command_center` database and record the connection string.
-   - Hosts or containers for the NestJS backend (Node.js 20+) and the React/Vite frontend (served as static files via Nginx/CDN/etc.).
+   - Hosts or containers for the NestJS backend (Node.js 22+) and the React/Vite frontend (served as static files via Nginx/CDN/etc.).
    - Optional reverse proxy, TLS certificates, logging/monitoring stack.
 
 2. **Configure environment**

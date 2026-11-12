@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:20-bookworm AS deps
+FROM node:24.22.3-bookworm AS deps
 WORKDIR /app
 
 ENV PNPM_HOME="/root/.local/share/pnpm"

@@ -416,20 +416,20 @@ install_base_packages() {
 }
 
 install_nodejs() {
-    step "Installing Node.js 20.x..."
-    
+    step "Installing Node.js 24.x..."
+
     if command -v node >/dev/null 2>&1; then
         local node_version
         node_version=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
-        if [[ $node_version -ge 20 ]]; then
+        if [[ $node_version -ge 22 ]]; then
             info "Node.js $(node --version) already installed"
             return
         else
-            warn "Found Node.js $node_version, upgrading to 20.x..."
+            warn "Found Node.js $node_version, upgrading to 24.x..."
         fi
     fi
-    
-    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash - || \
+
+    curl -fsSL https://deb.nodesource.com/setup_24.x | sudo bash - || \
         error_exit "Failed to add NodeSource repository"
     
     sudo apt-get install -y nodejs || error_exit "Failed to install Node.js"
@@ -447,7 +447,7 @@ install_pnpm() {
     fi
     
     if ! command -v corepack >/dev/null 2>&1; then
-        error_exit "Corepack not found. Please ensure Node.js 20+ is installed."
+        error_exit "Corepack not found. Please ensure Node.js 22+ is installed."
     fi
     
     sudo corepack enable || error_exit "Failed to enable corepack"

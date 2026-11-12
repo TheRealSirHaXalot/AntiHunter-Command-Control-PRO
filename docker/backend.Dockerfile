@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:20-bookworm AS deps
+FROM node:24.22.3-bookworm AS deps
 WORKDIR /app
 
 ENV PNPM_HOME="/root/.local/share/pnpm"
@@ -22,7 +22,7 @@ RUN pnpm --filter @command-center/backend prisma:generate \
   && pnpm --filter @command-center/backend build \
   && pnpm --filter @command-center/backend exec tsc -p tsconfig.seed.json --noEmit false
 
-FROM node:20.20.2-trixie-slim AS runtime
+FROM node:24.22.3-trixie-slim AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -45,9 +45,6 @@ RUN pnpm install --frozen-lockfile --prod --filter @command-center/backend...
 
 ENV npm_config_cache=/app/.npm-cache
 
-# Regenerate the Prisma client against the prod-installed @prisma/client
-RUN cd apps/backend && npx --yes prisma@5.22.0 generate
-
 # Provide udevadm and git inside the container
 RUN apt-get update  && apt-get install -y --no-install-recommends udev git  && rm -rf /var/lib/apt/lists/*
 
@@ -55,13 +52,15 @@ RUN apt-get update  && apt-get install -y --no-install-recommends udev git  && r
 COPY --from=builder /app/apps/backend ./apps/backend
 COPY --from=builder /app/scripts/db-update-helper.mjs ./scripts/db-update-helper.mjs
 
-RUN pnpm --filter @command-center/backend exec prisma version
+# Regenerate the Prisma client against the prod-installed @prisma/client
+RUN pnpm --filter @command-center/backend exec prisma generate \
+  && pnpm --filter @command-center/backend exec prisma version
 
 # Lightweight entrypoint handles migrations before boot
 COPY docker/backend-entrypoint.sh ./backend-entrypoint.sh
 RUN sed -i 's/\r$//' ./backend-entrypoint.sh && chmod +x ./backend-entrypoint.sh
 
-RUN mkdir -p /app/data/tiles /app/apps/backend/.secrets \
+RUN mkdir -p /app/data/tiles /app/apps/backend/.secrets /app/.npm-cache \
   && chown -R node:node /app/apps/backend /app/data /app/.npm-cache \
     /app/node_modules/.pnpm/prisma@* /app/node_modules/.pnpm/@prisma+client@*
 
