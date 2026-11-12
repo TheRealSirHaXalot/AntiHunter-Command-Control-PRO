@@ -52,7 +52,7 @@ jobs:
         shell: wsl-bash {0}
         run: |
           chmod +x scripts/setup-local.sh
-          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+          curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
           sudo apt-get install -y nodejs postgresql openssl
           bash -c 'source scripts/setup-local.sh; detect_os' || true
 
