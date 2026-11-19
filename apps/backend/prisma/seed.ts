@@ -3,6 +3,8 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Role, SiteAccessLevel } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { randomBytes } from 'node:crypto';
+import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { DEFAULT_FEATURES_BY_ROLE } from '../src/users/user-permissions.constants';
 
 const prisma = new PrismaClient({
@@ -73,6 +75,14 @@ async function main() {
     },
   });
 
+  const passwordFile = join(process.cwd(), '.secrets', 'initial-admin-password');
+  if (!adminExists && generatedPassword) {
+    mkdirSync(dirname(passwordFile), { recursive: true, mode: 0o700 });
+    chmodSync(dirname(passwordFile), 0o700);
+    writeFileSync(passwordFile, `${generatedPassword}\n`, { mode: 0o600 });
+    chmodSync(passwordFile, 0o600);
+  }
+
   const passwordHash = await argon2.hash(adminPassword);
   await prisma.user.upsert({
     where: { email: adminEmail },
@@ -111,7 +121,7 @@ async function main() {
 
   if (!adminExists && generatedPassword) {
     // eslint-disable-next-line no-console -- CLI feedback
-    console.log(`Admin account created: ${adminEmail} / ${generatedPassword}`);
+    console.log(`Admin account created: ${adminEmail}, password in ${passwordFile}`);
   }
 }
 
