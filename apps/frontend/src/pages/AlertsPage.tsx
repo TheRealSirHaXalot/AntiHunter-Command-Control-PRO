@@ -18,7 +18,7 @@ import type {
   AlertRuleScope,
   InventoryDevice,
 } from '../api/types';
-import { listWebhooks } from '../api/webhooks';
+import { AlertsRail } from '../components/AlertsRail';
 import { useAuthStore } from '../stores/auth-store';
 
 type FormMode = 'create' | 'edit';
@@ -55,7 +55,6 @@ interface AlertRuleFormState {
   mapColor: string;
   blink: boolean;
   mapLabel: string;
-  webhookIds: string[];
 }
 
 const BASE_FORM_STATE: Omit<AlertRuleFormState, 'inventoryMacs' | 'inventorySelections'> = {
@@ -80,7 +79,6 @@ const BASE_FORM_STATE: Omit<AlertRuleFormState, 'inventoryMacs' | 'inventorySele
   mapColor: '#f97316',
   blink: false,
   mapLabel: '',
-  webhookIds: [],
 };
 
 const SEVERITY_OPTIONS: AlarmLevel[] = ['INFO', 'NOTICE', 'ALERT', 'CRITICAL'];
@@ -114,12 +112,6 @@ export function AlertsPage() {
     queryKey: ['alert-rules', search],
     queryFn: () => listAlertRules(search.trim() ? { search: search.trim() } : {}),
     staleTime: 15_000,
-  });
-
-  const webhooksQuery = useQuery({
-    queryKey: ['webhooks'],
-    queryFn: listWebhooks,
-    staleTime: 30_000,
   });
 
   const inventorySearchQuery = useQuery({
@@ -262,15 +254,6 @@ export function AlertsPage() {
     });
   };
 
-  const handleToggleWebhook = (webhookId: string) => {
-    setFormState((prev) => {
-      if (prev.webhookIds.includes(webhookId)) {
-        return { ...prev, webhookIds: prev.webhookIds.filter((id) => id !== webhookId) };
-      }
-      return { ...prev, webhookIds: [...prev.webhookIds, webhookId] };
-    });
-  };
-
   const handleAddOui = (oui: string) => {
     const normalized = formatOui(oui);
     if (!normalized) {
@@ -299,53 +282,7 @@ export function AlertsPage() {
 
   return (
     <div className="config-shell alerts-shell">
-      <aside className="config-rail alerts-rail">
-        <div className="config-rail__title">
-          <h2 className="config-rail__heading">Alerts</h2>
-          <p className="config-rail__copy">
-            {isAdsbAlerts
-              ? 'Manage ADS-B and ACARS alert rules, notification routing, and monitoring.'
-              : 'Manage custom alert rules, notification routing, and alert event monitoring.'}
-          </p>
-        </div>
-        <nav className="config-menu" aria-label="Alert pages">
-          <NavLink
-            to="/alerts/custom"
-            className={({ isActive }) =>
-              `config-menu__item${isActive ? ' config-menu__item--active' : ''}`
-            }
-            end
-          >
-            <span className="config-menu__label">DIGI node Alerts</span>
-            <span className="config-menu__description">
-              Vendor, SSID, channel, and device-based rules.
-            </span>
-          </NavLink>
-          <NavLink
-            to="/alerts/adsb"
-            className={({ isActive }) =>
-              `config-menu__item${isActive ? ' config-menu__item--active' : ''}`
-            }
-            end
-          >
-            <span className="config-menu__label">ADS-B &amp; ACARS Alerts</span>
-            <span className="config-menu__description">
-              Rules for aviation tracks and ACARS message activity.
-            </span>
-          </NavLink>
-          <NavLink
-            to="/alerts/events"
-            className={({ isActive }) =>
-              `config-menu__item${isActive ? ' config-menu__item--active' : ''}`
-            }
-          >
-            <span className="config-menu__label">Event log</span>
-            <span className="config-menu__description">
-              Recent alert events and operator notifications.
-            </span>
-          </NavLink>
-        </nav>
-      </aside>
+      <AlertsRail />
 
       <section className="panel alerts-panel">
         <header className="panel-header alerts-header">
@@ -368,6 +305,9 @@ export function AlertsPage() {
               />
             </label>
             <div className="alerts-header__actions">
+              <NavLink to="/alerts/remote" className="control-chip control-chip--ghost">
+                Remote alerts
+              </NavLink>
               <button
                 type="button"
                 className="control-chip control-chip--ghost"
@@ -729,58 +669,13 @@ export function AlertsPage() {
             <div className="config-grid alerts-stack">
               <article className="config-card">
                 <header>
-                  <h2>Notifications & routing</h2>
-                  <p>Choose how this alert notifies operators and where messages are delivered.</p>
+                  <h2>Alert message</h2>
+                  <p>
+                    Delivery is set by this rule&rsquo;s row in Remote alerts &rarr; Alert sources.
+                    Customize the alert text below.
+                  </p>
                 </header>
                 <div className="config-card__body">
-                  <div className="toggle-row">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={formState.notifyVisual}
-                        onChange={(event) =>
-                          setFormState((prev) => ({ ...prev, notifyVisual: event.target.checked }))
-                        }
-                        disabled={!canEdit}
-                      />
-                      Visual notification
-                    </label>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={formState.notifyAudible}
-                        onChange={(event) =>
-                          setFormState((prev) => ({ ...prev, notifyAudible: event.target.checked }))
-                        }
-                        disabled={!canEdit}
-                      />
-                      Audible alarm
-                    </label>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={formState.notifyEmail}
-                        onChange={(event) =>
-                          setFormState((prev) => ({ ...prev, notifyEmail: event.target.checked }))
-                        }
-                        disabled={!canEdit}
-                      />
-                      Send email
-                    </label>
-                  </div>
-                  <label className="form-field">
-                    <span>Email recipients</span>
-                    <textarea
-                      rows={2}
-                      placeholder="operator@example.com"
-                      value={formState.emailInput}
-                      onChange={(event) =>
-                        setFormState((prev) => ({ ...prev, emailInput: event.target.value }))
-                      }
-                      disabled={!canEdit}
-                    />
-                    <small>One address per line.</small>
-                  </label>
                   <label className="form-field">
                     <span>Custom message template</span>
                     <textarea
@@ -793,30 +688,6 @@ export function AlertsPage() {
                       disabled={!canEdit}
                     />
                   </label>
-                  <div className="alerts-webhook-picker">
-                    <span>Webhook notifications</span>
-                    {webhooksQuery.isLoading ? (
-                      <p className="empty-state">Loading webhooks...</p>
-                    ) : webhooksQuery.data && webhooksQuery.data.length > 0 ? (
-                      <div className="alerts-webhook-picker__list">
-                        {webhooksQuery.data.map((webhook) => (
-                          <label key={webhook.id}>
-                            <input
-                              type="checkbox"
-                              checked={formState.webhookIds.includes(webhook.id)}
-                              onChange={() => handleToggleWebhook(webhook.id)}
-                              disabled={!canEdit}
-                            />
-                            <span>{webhook.name}</span>
-                          </label>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="empty-state">
-                        No webhook endpoints configured. Set them up in Configuration ? Webhooks.
-                      </p>
-                    )}
-                  </div>
                 </div>
               </article>
 
@@ -957,7 +828,6 @@ function buildFormState(rule: AlertRule): AlertRuleFormState {
     mapColor: rule.mapStyle?.color ?? '#f97316',
     blink: rule.mapStyle?.blink ?? false,
     mapLabel: rule.mapStyle?.label ?? '',
-    webhookIds: [...(rule.webhookIds ?? [])],
   };
 }
 
@@ -987,7 +857,6 @@ function buildPayload(state: AlertRuleFormState): AlertRulePayload {
       blink: state.blink,
       label: state.mapLabel.trim() || undefined,
     },
-    webhookIds: state.webhookIds,
   };
 }
 

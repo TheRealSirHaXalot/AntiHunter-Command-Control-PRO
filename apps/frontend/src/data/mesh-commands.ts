@@ -74,6 +74,7 @@ export interface CommandParameter {
   max?: number;
   step?: number;
   suffix?: string;
+  secret?: boolean;
 }
 
 export interface CommandDefinition {
@@ -97,26 +98,14 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     parameters: [],
     examples: [
       { target: '@ALL', params: [], label: 'All nodes' },
-      { target: '@NODE_22', params: [], label: 'Specific node' },
-    ],
-  },
-  {
-    name: 'SUMMARY',
-    group: 'Status',
-    description:
-      'Report a one-line summary: mode, scan state, device count, targets, hits, incidents and campaign.',
-    defaultTarget: '@ALL',
-    parameters: [],
-    examples: [
-      { target: '@ALL', params: [], label: 'All nodes' },
-      { target: '@NODE_22', params: [], label: 'Specific node' },
+      { target: '@AH01', params: [], label: 'Specific node' },
     ],
   },
   {
     name: 'CONFIG_CHANNELS',
     group: 'Configuration',
     description: 'Configure WiFi channels using CSV list or range (1..14).',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [
       {
         key: 'channels',
@@ -128,28 +117,30 @@ export const MESH_COMMANDS: CommandDefinition[] = [
       },
     ],
     examples: [
-      { target: '@NODE_22', params: ['1,6,11'] },
+      { target: '@AH01', params: ['1,6,11'] },
       { target: '@ALL', params: ['1..14'] },
     ],
   },
   {
     name: 'CONFIG_TARGETS',
     group: 'Configuration',
-    description: 'Update target watchlist using pipe-delimited MACs.',
+    description:
+      'Update target watchlist using pipe-delimited MACs, MAC prefixes, SSIDs or T- IDs.',
     defaultTarget: '@ALL',
     parameters: [
       {
         key: 'macs',
-        label: 'Target MACs',
-        type: 'pipeList',
-        placeholder: 'AA:BB:CC:DD:EE:FF|11:22:33:44:55:66',
-        helper: 'Pipe-separated MAC list.',
+        label: 'Targets',
+        type: 'text',
+        placeholder: 'AA:BB:CC:DD:EE:FF|11:22:33|MyNetwork|T-1A2B',
+        helper:
+          'Pipe-separated: full MAC, 3-byte prefix (AA:BB:CC), SSID (up to 32 characters) or tracer ID. The whole command line must stay within 230 characters.',
         required: true,
       },
     ],
     examples: [
       {
-        target: '@NODE_22',
+        target: '@AH01',
         params: ['AA:BB:CC:DD:EE:FF|11:22:33:44:55:66'],
       },
     ],
@@ -158,7 +149,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     name: 'CONFIG_RSSI',
     group: 'Configuration',
     description: 'Set detection RSSI threshold (negative dBm).',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [
       {
         key: 'threshold',
@@ -172,24 +163,24 @@ export const MESH_COMMANDS: CommandDefinition[] = [
         step: 1,
       },
     ],
-    examples: [{ target: '@NODE_22', params: ['-65'] }],
+    examples: [{ target: '@AH01', params: ['-65'] }],
   },
   {
     name: 'CONFIG_NODEID',
     group: 'Configuration',
     description: 'Assign a new short identifier to a node.',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [
       {
         key: 'nodeId',
         label: 'Node Identifier',
         type: 'text',
         placeholder: 'AH03',
-        helper: 'Uppercase letters/numbers, 2-6 characters.',
+        helper: 'Letters and numbers, 2-5 characters.',
         required: true,
       },
     ],
-    examples: [{ target: '@NODE_22', params: ['AH03'] }],
+    examples: [{ target: '@AH01', params: ['AH03'] }],
   },
   {
     name: 'SCAN_START',
@@ -229,7 +220,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     allowForever: true,
     examples: [
       { target: '@ALL', params: ['0', '60', '1,6,11'] },
-      { target: '@NODE_22', params: ['2', '300', '1..14', 'FOREVER'] },
+      { target: '@AH01', params: ['2', '300', '1..14', 'FOREVER'] },
     ],
   },
   {
@@ -259,13 +250,20 @@ export const MESH_COMMANDS: CommandDefinition[] = [
         max: 86400,
         suffix: 'sec',
       },
+      {
+        key: 'channels',
+        label: 'Channels (optional)',
+        type: 'text',
+        placeholder: 'CH1,6,11',
+        helper: 'CH followed by a list or range, 1-14. Empty uses the node channel list.',
+      },
     ],
     allowForever: true,
     allowProbe: true,
     examples: [
       { target: '@ALL', params: ['2', '300'] },
       { target: '@ALL', params: ['2', '300', '+PROBE'] },
-      { target: '@NODE_22', params: ['2', '300', 'FOREVER'] },
+      { target: '@AH01', params: ['2', '300', 'FOREVER'] },
     ],
   },
   {
@@ -296,7 +294,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     allowForever: true,
     examples: [
       { target: '@ALL', params: ['300'] },
-      { target: '@NODE_22', params: ['600', 'FOREVER'] },
+      { target: '@AH01', params: ['600', 'FOREVER'] },
     ],
   },
   {
@@ -326,7 +324,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     allowForever: true,
     examples: [
       { target: '@ALL', params: ['600'] },
-      { target: '@NODE_22', params: ['600', 'FOREVER'] },
+      { target: '@AH01', params: ['600', 'FOREVER'] },
     ],
   },
   {
@@ -349,7 +347,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     allowForever: true,
     examples: [
       { target: '@ALL', params: ['300'] },
-      { target: '@NODE_22', params: ['300', 'FOREVER'] },
+      { target: '@AH01', params: ['300', 'FOREVER'] },
     ],
   },
   {
@@ -383,7 +381,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     allowForever: true,
     examples: [
       { target: '@ALL', params: ['2', '600'] },
-      { target: '@NODE_22', params: ['0', '600', 'FOREVER'] },
+      { target: '@AH01', params: ['0', '600', 'FOREVER'] },
     ],
   },
   {
@@ -419,7 +417,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     examples: [
       { target: '@ALL', params: ['2', '300'] },
       { target: '@ALL', params: ['2', '300', '+ALL'] },
-      { target: '@NODE_22', params: ['0', '300', 'FOREVER'] },
+      { target: '@AH01', params: ['0', '300', 'FOREVER'] },
     ],
   },
   {
@@ -465,10 +463,17 @@ export const MESH_COMMANDS: CommandDefinition[] = [
           { label: '2 - Both', value: '2' },
         ],
       },
+      {
+        key: 'channels',
+        label: 'Channels (optional)',
+        type: 'text',
+        placeholder: 'CH1,6,11',
+        helper: 'CH followed by a list or range, 1-177.',
+      },
     ],
     examples: [
       { target: '@ALL', params: ['0', '300', '0'] },
-      { target: '@NODE_22', params: ['1', '600'] },
+      { target: '@AH01', params: ['1', '600'] },
     ],
   },
   {
@@ -497,7 +502,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     ],
     examples: [
       { target: '@ALL', params: [] },
-      { target: '@NODE_22', params: ['100'] },
+      { target: '@AH01', params: ['100'] },
     ],
   },
   {
@@ -562,7 +567,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     ],
     examples: [
       { target: '@ALL', params: ['AA:BB:CC:DD:EE:FF', '30', '2'] },
-      { target: '@NODE_22', params: ['T-sensor001', '60', '3'] },
+      { target: '@AH01', params: ['T-sensor001', '60', '3'] },
       { target: '@ALL', params: ['AA:BB:CC:DD:EE:FF', '60', '2', '1.5', '0.8'] },
     ],
   },
@@ -577,107 +582,87 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     name: 'TRIANGULATE_RESULTS',
     group: 'Triangulation',
     description: 'Fetch the latest triangulation results from a node.',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [],
-  },
-  {
-    name: 'CALIBRATE',
-    group: 'Triangulation',
-    description:
-      'Calibrate this node against a Wi-Fi or Bluetooth device at a measured distance. The node listens for 30 seconds.',
-    defaultTarget: '@NODE_22',
-    parameters: [
-      {
-        key: 'mac',
-        label: 'Reference MAC',
-        type: 'text',
-        placeholder: 'AA:BB:CC:DD:EE:FF',
-        required: true,
-      },
-      {
-        key: 'meters',
-        label: 'Distance (meters)',
-        type: 'number',
-        placeholder: '5',
-        required: true,
-        min: 0.5,
-        max: 100,
-        step: 0.5,
-        suffix: 'm',
-      },
-    ],
-    examples: [{ target: '@NODE_22', params: ['AA:BB:CC:DD:EE:FF', '5'] }],
-  },
-  {
-    name: 'CALIBRATE_RESET',
-    group: 'Triangulation',
-    description: 'Clear the calibration. Distances go back to the RF environment values.',
-    defaultTarget: '@NODE_22',
-    parameters: [],
-    examples: [{ target: '@NODE_22', params: [] }],
   },
   {
     name: 'VIBRATION_STATUS',
     group: 'Security',
     description: 'Query tamper/vibration sensor status.',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [],
   },
   {
     name: 'VIBRATION_ON',
     group: 'Security',
     description: 'Enable tamper/vibration detection.',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [],
   },
   {
     name: 'VIBRATION_OFF',
     group: 'Security',
     description: 'Disable tamper/vibration detection.',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [],
   },
   {
     name: 'ERASE_REQUEST',
     group: 'Security',
-    description: 'Request erase token to perform a force erase',
-    defaultTarget: '@NODE_22',
+    description:
+      'Request a one-time erase token (valid 5 minutes, one request every 20 seconds). Admin only.',
+    defaultTarget: '@AH01',
     parameters: [],
-    examples: [
-      { target: '@NODE_22', params: [], label: 'Request token' },
-      { target: '@ALL', params: [], label: 'Broadcast request' },
-    ],
+    examples: [{ target: '@AH01', params: [], label: 'Request token' }],
   },
   {
     name: 'ERASE_FORCE',
     group: 'Security',
-    description: 'Force emergency erase. Send ERASE_REQUEST to the node first.',
-    defaultTarget: '@NODE_22',
+    description:
+      'Force emergency erase. Needs a fresh ERASE_REQUEST token and the node erase key. Admin only.',
+    defaultTarget: '@AH01',
     parameters: [
       {
-        key: 'answer',
-        label: 'Erase Answer',
+        key: 'token',
+        label: 'Erase Token or Answer',
         type: 'text',
-        placeholder: 'd27f2e8c',
+        placeholder: 'AH_0A1B2C3D_4E5F6A7B_0000012C',
         helper:
-          "First 8 hex of HMAC-SHA256 of the node's ERASE_TOKEN, keyed with its erase key: printf %s '<token>' | openssl dgst -sha256 -hmac '<key>'",
+          'Token from ERASE_REQUEST (AH_ plus three hex groups), or a ready-made 8 or 64 character hex answer.',
         required: true,
+      },
+      {
+        key: 'key',
+        label: 'Erase Key',
+        type: 'text',
+        secret: true,
+        helper:
+          'Used locally to compute the answer. Not stored. Leave empty if you pasted an answer.',
       },
     ],
   },
   {
     name: 'ERASE_CANCEL',
     group: 'Security',
-    description: 'Cancel an ongoing erase. Send ERASE_REQUEST to the node first.',
-    defaultTarget: '@NODE_22',
+    description:
+      'Cancel a tamper erase countdown. Needs a fresh ERASE_REQUEST token and the node erase key. Admin only.',
+    defaultTarget: '@AH01',
     parameters: [
       {
-        key: 'answer',
-        label: 'Erase Answer',
+        key: 'token',
+        label: 'Erase Token or Answer',
         type: 'text',
-        placeholder: 'd27f2e8c',
-        helper: "First 8 hex of HMAC-SHA256 of the node's ERASE_TOKEN, keyed with its erase key.",
+        placeholder: 'AH_0A1B2C3D_4E5F6A7B_0000012C',
+        helper: 'Token from ERASE_REQUEST, or a ready-made 8 or 64 character hex answer.',
         required: true,
+      },
+      {
+        key: 'key',
+        label: 'Erase Key',
+        type: 'text',
+        secret: true,
+        helper:
+          'Used locally to compute the answer. Not stored. Leave empty if you pasted an answer.',
       },
     ],
   },
@@ -685,7 +670,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     name: 'AUTOERASE_ENABLE',
     group: 'Security',
     description: 'Enable auto-erase with optional custom parameters',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [
       {
         key: 'setupDelay',
@@ -743,40 +728,66 @@ export const MESH_COMMANDS: CommandDefinition[] = [
         step: 1,
       },
       {
-        key: 'answer',
-        label: 'Erase Answer',
+        key: 'token',
+        label: 'Erase Token or Answer',
         type: 'text',
-        placeholder: 'd27f2e8c',
+        placeholder: 'AH_0A1B2C3D_4E5F6A7B_0000012C',
         helper:
-          "Send ERASE_REQUEST first. First 8 hex of HMAC-SHA256 of the node's ERASE_TOKEN, keyed with its erase key. Leave all five values empty for defaults.",
+          'Token from ERASE_REQUEST, or a ready-made 8 or 64 character hex answer. Fill all five timings or none.',
         required: true,
+      },
+      {
+        key: 'key',
+        label: 'Erase Key',
+        type: 'text',
+        secret: true,
+        helper:
+          'Used locally to compute the answer. Not stored. Leave empty if you pasted an answer.',
+      },
+    ],
+    examples: [
+      {
+        target: '@AH01',
+        params: [],
+        label:
+          'Keep stored timings (default 120s setup, 30s erase, 3 vibs, 20s window, 300s cooldown)',
       },
     ],
   },
   {
     name: 'AUTOERASE_DISABLE',
     group: 'Security',
-    description: 'Disable auto-erase. Send ERASE_REQUEST to the node first.',
-    defaultTarget: '@NODE_22',
+    description:
+      'Disable auto-erase. Needs a fresh ERASE_REQUEST token and the erase key. Admin only.',
+    defaultTarget: '@AH01',
     parameters: [
       {
-        key: 'answer',
-        label: 'Erase Answer',
+        key: 'token',
+        label: 'Erase Token or Answer',
         type: 'text',
-        placeholder: 'd27f2e8c',
-        helper: "First 8 hex of HMAC-SHA256 of the node's ERASE_TOKEN, keyed with its erase key.",
+        placeholder: 'AH_0A1B2C3D_4E5F6A7B_0000012C',
+        helper: 'Token from ERASE_REQUEST, or a ready-made 8 or 64 character hex answer.',
         required: true,
       },
+      {
+        key: 'key',
+        label: 'Erase Key',
+        type: 'text',
+        secret: true,
+        helper:
+          'Used locally to compute the answer. Not stored. Leave empty if you pasted an answer.',
+      },
     ],
+    examples: [{ target: '@AH01', params: [], label: 'Disable auto-erase' }],
   },
   {
     name: 'AUTOERASE_STATUS',
     group: 'Security',
     description: 'Check current auto-erase configuration and state.',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [],
     examples: [
-      { target: '@NODE_22', params: [], label: 'Check node status' },
+      { target: '@AH01', params: [], label: 'Check node status' },
       { target: '@ALL', params: [], label: 'Check all nodes' },
     ],
   },
@@ -784,21 +795,21 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     name: 'HB_ON',
     group: 'Status',
     description: 'Enable periodic heartbeat broadcast over mesh.',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [],
   },
   {
     name: 'HB_OFF',
     group: 'Status',
     description: 'Disable heartbeat broadcast.',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [],
   },
   {
     name: 'HB_INTERVAL',
     group: 'Status',
     description: 'Set heartbeat interval (1-60 minutes).',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [
       {
         key: 'minutes',
@@ -812,7 +823,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
       },
     ],
     examples: [
-      { target: '@NODE_22', params: ['5'] },
+      { target: '@AH01', params: ['5'] },
       { target: '@ALL', params: ['10'] },
     ],
   },
@@ -916,7 +927,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     name: 'DETECT_CFG',
     group: 'Sentinel',
     description: 'Apply detector tunables as a JSON payload.',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [
       {
         key: 'json',
@@ -927,21 +938,21 @@ export const MESH_COMMANDS: CommandDefinition[] = [
         required: true,
       },
     ],
-    examples: [{ target: '@NODE_22', params: ['{"eviltwin":true}'] }],
+    examples: [{ target: '@AH01', params: ['{"eviltwin":true}'] }],
   },
   {
     name: 'DETECT_CFG_GET',
     group: 'Sentinel',
     description: 'Request the current detector configuration.',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [],
-    examples: [{ target: '@NODE_22', params: [] }],
+    examples: [{ target: '@AH01', params: [] }],
   },
   {
     name: 'INCIDENTS',
     group: 'Sentinel',
     description: 'Request the sentinel incident log (optional count).',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [
       {
         key: 'count',
@@ -956,89 +967,23 @@ export const MESH_COMMANDS: CommandDefinition[] = [
       },
     ],
     examples: [
-      { target: '@NODE_22', params: [] },
-      { target: '@NODE_22', params: ['50'] },
+      { target: '@AH01', params: [] },
+      { target: '@AH01', params: ['50'] },
     ],
   },
   {
     name: 'INCIDENTS_CLEAR',
     group: 'Sentinel',
     description: 'Clear the sentinel incident log.',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [],
-    examples: [{ target: '@NODE_22', params: [] }],
-  },
-  {
-    name: 'DETECT_CLEAR',
-    group: 'Sentinel',
-    description: 'Clear all detector state and delete the detector logs on the SD card.',
-    defaultTarget: '@NODE_22',
-    parameters: [],
-    examples: [{ target: '@NODE_22', params: [] }],
-  },
-  {
-    name: 'RADIO_KNOWN_ADD',
-    group: 'Sentinel',
-    description:
-      'Mark a Meshtastic or MeshCore radio as known. The node stops alerting on it. The Nodes page does this for all nodes.',
-    defaultTarget: '@ALL',
-    parameters: [
-      {
-        key: 'mac',
-        label: 'Radio MAC',
-        type: 'text',
-        placeholder: 'AA:BB:CC:DD:EE:FF',
-        required: true,
-      },
-      {
-        key: 'radio',
-        label: 'Radio type',
-        type: 'select',
-        required: true,
-        options: [
-          { label: 'Meshtastic', value: 'Meshtastic' },
-          { label: 'MeshCore', value: 'MeshCore' },
-        ],
-      },
-      {
-        key: 'name',
-        label: 'Advertised name',
-        type: 'text',
-        required: false,
-        helper: 'Optional. Matches the radio when its Bluetooth address changes.',
-      },
-    ],
-    examples: [{ target: '@ALL', params: ['AA:BB:CC:DD:EE:FF', 'Meshtastic'] }],
-  },
-  {
-    name: 'RADIO_KNOWN_DEL',
-    group: 'Sentinel',
-    description: 'Remove a radio from the known list.',
-    defaultTarget: '@ALL',
-    parameters: [
-      {
-        key: 'mac',
-        label: 'Radio MAC',
-        type: 'text',
-        placeholder: 'AA:BB:CC:DD:EE:FF',
-        required: true,
-      },
-    ],
-    examples: [{ target: '@ALL', params: ['AA:BB:CC:DD:EE:FF'] }],
-  },
-  {
-    name: 'RADIO_KNOWN_CLEAR',
-    group: 'Sentinel',
-    description: 'Empty the known radio list on the node.',
-    defaultTarget: '@NODE_22',
-    parameters: [],
-    examples: [{ target: '@NODE_22', params: [] }],
+    examples: [{ target: '@AH01', params: [] }],
   },
   {
     name: 'CSI_MOTION_START',
     group: 'Sentinel',
     description: 'Start CSI motion detection.',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [
       {
         key: 'secs',
@@ -1072,7 +1017,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
       },
     ],
     examples: [
-      { target: '@NODE_22', params: ['300'] },
+      { target: '@AH01', params: ['300'] },
       { target: '@ALL', params: ['0', 'FOREVER'] },
     ],
   },
@@ -1080,31 +1025,31 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     name: 'CSI_STATUS',
     group: 'Sentinel',
     description: 'Print the CSI report on the node.',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [],
-    examples: [{ target: '@NODE_22', params: [] }],
+    examples: [{ target: '@AH01', params: [] }],
   },
   {
     name: 'CSI_JSON',
     group: 'Sentinel',
     description: 'Print the CSI JSON state on the node.',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [],
-    examples: [{ target: '@NODE_22', params: [] }],
+    examples: [{ target: '@AH01', params: [] }],
   },
   {
     name: 'CSI_RECAL',
     group: 'Sentinel',
     description: 'Reset the CSI threshold override to the firmware default.',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [],
-    examples: [{ target: '@NODE_22', params: [] }],
+    examples: [{ target: '@AH01', params: [] }],
   },
   {
     name: 'CSI_EXCLUDE',
     group: 'Sentinel',
     description: 'Exclude a transmitter MAC from CSI.',
-    defaultTarget: '@NODE_22',
+    defaultTarget: '@AH01',
     parameters: [
       {
         key: 'mac',
@@ -1115,8 +1060,8 @@ export const MESH_COMMANDS: CommandDefinition[] = [
       },
     ],
     examples: [
-      { target: '@NODE_22', params: ['AA:BB:CC:DD:EE:FF'] },
-      { target: '@NODE_22', params: ['NONE'] },
+      { target: '@AH01', params: ['AA:BB:CC:DD:EE:FF'] },
+      { target: '@AH01', params: ['NONE'] },
     ],
   },
   {
@@ -1135,7 +1080,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     ],
     examples: [
       { target: '@ALL', params: ['SENSITIVITY=LOW'] },
-      { target: '@NODE_22', params: ['CLEAR_AFTER=10'] },
+      { target: '@AH01', params: ['CLEAR_AFTER=10'] },
     ],
   },
   {
@@ -1199,39 +1144,6 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     examples: [{ target: '@NODE_22', params: ['2'] }],
   },
   {
-    name: 'DEVICE_DB_CLEAR',
-    group: 'Configuration',
-    description: 'Clear the discovered-device database (Beta and Experimental headless builds).',
-    defaultTarget: '@NODE_22',
-    parameters: [],
-    examples: [{ target: '@NODE_22', params: [] }],
-  },
-  {
-    name: 'PROBE_DB_CLEAR',
-    group: 'Configuration',
-    description: 'Delete the probe request database.',
-    defaultTarget: '@NODE_22',
-    parameters: [],
-    examples: [{ target: '@NODE_22', params: [] }],
-  },
-  {
-    name: 'BASELINE_RESET',
-    group: 'Configuration',
-    description: 'Delete the learned baseline from memory and SD. Refused while a scan runs.',
-    defaultTarget: '@NODE_22',
-    parameters: [],
-    examples: [{ target: '@NODE_22', params: [] }],
-  },
-  {
-    name: 'RANDOMIZATION_RESET',
-    group: 'Configuration',
-    description:
-      'Delete the saved randomized-MAC identities from memory and SD. Refused while a scan runs.',
-    defaultTarget: '@NODE_22',
-    parameters: [],
-    examples: [{ target: '@NODE_22', params: [] }],
-  },
-  {
     name: 'MESH_DEDUP_CLEAR',
     group: 'Configuration',
     description: 'Clear the mesh de-duplication cache.',
@@ -1242,25 +1154,42 @@ export const MESH_COMMANDS: CommandDefinition[] = [
   {
     name: 'CONFIG_ERASE_PSK',
     group: 'Security',
-    description: 'Set the erase and factory reset key.',
-    defaultTarget: '@NODE_22',
+    description:
+      'Change the erase key. Admin only. The new key travels in clear text over the mesh.',
+    defaultTarget: '@AH01',
     parameters: [
       {
-        key: 'key',
-        label: 'Pre-Shared Key',
+        key: 'newKey',
+        label: 'New Erase Key',
         type: 'text',
-        placeholder: 'shared-secret',
-        helper: '1 to 64 characters.',
+        secret: true,
+        helper: '8 to 64 characters, no colon.',
+        required: true,
+      },
+      {
+        key: 'token',
+        label: 'Erase Token (optional)',
+        type: 'text',
+        placeholder: 'AH_0A1B2C3D_4E5F6A7B_0000012C',
+        helper:
+          'Token from ERASE_REQUEST. With a token the current key is turned into an answer locally instead of being sent in clear text.',
+      },
+      {
+        key: 'currentKey',
+        label: 'Current Erase Key',
+        type: 'text',
+        secret: true,
+        helper: 'Not stored.',
         required: true,
       },
     ],
-    examples: [{ target: '@NODE_22', params: ['shared-secret'] }],
   },
   {
     name: 'FACTORY_RESET',
     group: 'Security',
-    description: 'Factory reset a node. Send ERASE_REQUEST to the node first.',
-    defaultTarget: '@NODE_22',
+    description:
+      'Factory reset a node. Needs a fresh ERASE_REQUEST token and the node erase key. Admin only.',
+    defaultTarget: '@AH01',
     parameters: [
       {
         key: 'tier',
@@ -1274,132 +1203,81 @@ export const MESH_COMMANDS: CommandDefinition[] = [
         ],
       },
       {
-        key: 'credential',
-        label: 'Erase Answer',
+        key: 'token',
+        label: 'Erase Token or Answer',
         type: 'text',
-        placeholder: 'd27f2e8c',
-        helper: "First 8 hex of HMAC-SHA256 of the node's ERASE_TOKEN, keyed with its erase key.",
+        placeholder: 'AH_0A1B2C3D_4E5F6A7B_0000012C',
+        helper: 'Token from ERASE_REQUEST, or a ready-made 8 or 64 character hex answer.',
         required: true,
+      },
+      {
+        key: 'key',
+        label: 'Erase Key',
+        type: 'text',
+        secret: true,
+        helper:
+          'Used locally to compute the answer. Not stored. Leave empty if you pasted an answer.',
       },
     ],
   },
   {
+    name: 'SUMMARY',
+    group: 'Status',
+    description: 'Report device count, target count, hits, incidents, campaign and uptime.',
+    defaultTarget: '@ALL',
+    parameters: [],
+    examples: [{ target: '@ALL', params: [] }],
+  },
+  {
     name: 'MESH_TX_CANCEL',
-    group: 'Configuration',
-    description: 'Cancel queued mesh transmissions; scan keeps running.',
+    group: 'Status',
+    description: 'Drop queued mesh messages except triangulation. A running scan continues.',
     defaultTarget: '@ALL',
     parameters: [],
   },
   {
     name: 'BLE_CLASSIFY',
     group: 'Configuration',
-    description: 'Toggle BLE device classification.',
+    description: 'Turn BLE device classification on or off.',
     defaultTarget: '@ALL',
     parameters: [
       {
         key: 'enabled',
-        label: 'BLE Classify',
+        label: 'BLE Classification',
         type: 'select',
         required: true,
         options: [
-          { label: 'Enabled', value: '1' },
-          { label: 'Disabled', value: '0' },
+          { label: 'On', value: '1' },
+          { label: 'Off', value: '0' },
+        ],
+      },
+    ],
+    examples: [{ target: '@ALL', params: ['1'] }],
+  },
+  {
+    name: 'BLE_LONGRANGE',
+    group: 'Configuration',
+    description:
+      'Also listen for Bluetooth 5 long range. Ordinary BLE gets less listening time. Off by default.',
+    defaultTarget: '@ALL',
+    parameters: [
+      {
+        key: 'enabled',
+        label: 'BLE Long Range',
+        type: 'select',
+        required: true,
+        options: [
+          { label: 'On', value: '1' },
+          { label: 'Off', value: '0' },
         ],
       },
     ],
     examples: [{ target: '@ALL', params: ['0'] }],
   },
   {
-    name: 'BASELINE_WATCH',
-    group: 'Detection',
-    description: 'Mark the running baseline to start watching for anomalies.',
-    defaultTarget: '@ALL',
-    parameters: [],
-  },
-  {
-    name: 'PCAP_AUTO',
-    group: 'Scanning',
-    description: 'Set or read PCAP storage budget and free-space floor (MB).',
-    defaultTarget: '@NODE_22',
-    parameters: [
-      {
-        key: 'limits',
-        label: 'Budget,Floor (MB)',
-        type: 'text',
-        placeholder: '512,64',
-        helper: 'Optional budgetMB,floorMB. Empty reads current.',
-        required: false,
-      },
-    ],
-    examples: [{ target: '@NODE_22', params: ['512,64'] }],
-  },
-  {
-    name: 'SD_REPAIR',
-    group: 'Configuration',
-    description: 'Set SD auto-repair, or NOW to repair (erases the card).',
-    defaultTarget: '@NODE_22',
-    parameters: [
-      {
-        key: 'action',
-        label: 'Action',
-        type: 'select',
-        required: true,
-        options: [
-          { label: 'Auto-repair on', value: 'ON' },
-          { label: 'Auto-repair off', value: 'OFF' },
-          { label: 'Repair now (erases card)', value: 'NOW' },
-        ],
-      },
-    ],
-    examples: [{ target: '@NODE_22', params: ['ON'] }],
-  },
-  {
-    name: 'SCHED_ADD',
-    group: 'Scanning',
-    description: 'Add a scheduled scan block (max 8 per node).',
-    defaultTarget: '@NODE_22',
-    parameters: [
-      {
-        key: 'schedule',
-        label: 'Schedule',
-        type: 'text',
-        placeholder: '2026-09-30T02:00|86400|/scan|mode=2&secs=600',
-        helper: 'start|repeat secs (0 or 600+)|/scan, /sniffer or /drone|options',
-        required: true,
-      },
-    ],
-    examples: [{ target: '@NODE_22', params: ['2026-09-30T02:00|86400|/scan|mode=2&secs=600'] }],
-  },
-  {
-    name: 'SCHED_LIST',
-    group: 'Scanning',
-    description: 'Count scheduled blocks; entries print on node serial.',
-    defaultTarget: '@NODE_22',
-    parameters: [],
-  },
-  {
-    name: 'SCHED_DEL',
-    group: 'Scanning',
-    description: 'Delete a scheduled block by SCHED_LIST number.',
-    defaultTarget: '@NODE_22',
-    parameters: [
-      {
-        key: 'index',
-        label: 'Entry Number',
-        type: 'number',
-        placeholder: '1',
-        required: true,
-        min: 1,
-        max: 8,
-        step: 1,
-      },
-    ],
-    examples: [{ target: '@NODE_22', params: ['1'] }],
-  },
-  {
     name: 'CAMPAIGN_START',
-    group: 'Campaign',
-    description: 'Start a named campaign; logs and exports are tagged with it.',
+    group: 'Configuration',
+    description: 'Start a named campaign. Logged events carry the name. Ends a running campaign.',
     defaultTarget: '@ALL',
     parameters: [
       {
@@ -1407,7 +1285,7 @@ export const MESH_COMMANDS: CommandDefinition[] = [
         label: 'Campaign Name',
         type: 'text',
         placeholder: 'site-a',
-        helper: 'A-Z a-z 0-9 - _, max 23.',
+        helper: 'Letters, digits, "-" and "_", 1-23 characters.',
         required: true,
       },
     ],
@@ -1415,57 +1293,203 @@ export const MESH_COMMANDS: CommandDefinition[] = [
   },
   {
     name: 'CAMPAIGN_STOP',
-    group: 'Campaign',
-    description: 'Stop the active campaign.',
+    group: 'Configuration',
+    description: 'End the running campaign.',
     defaultTarget: '@ALL',
     parameters: [],
   },
   {
     name: 'CAMPAIGN_STATUS',
-    group: 'Campaign',
-    description: 'Report the active campaign name.',
+    group: 'Configuration',
+    description: 'Report the running campaign.',
     defaultTarget: '@ALL',
     parameters: [],
   },
   {
-    name: 'VIBSCAN_SET',
-    group: 'Security',
-    description: 'Configure vibration-triggered auto-scan.',
-    defaultTarget: '@NODE_22',
+    name: 'DEVICE_DB_CLEAR',
+    group: 'Configuration',
+    description: 'Delete the node device database.',
+    defaultTarget: '@AH01',
+    parameters: [],
+  },
+  {
+    name: 'PROBE_DB_CLEAR',
+    group: 'Configuration',
+    description: 'Delete the node probe database.',
+    defaultTarget: '@AH01',
+    parameters: [],
+  },
+  {
+    name: 'BASELINE_WATCH',
+    group: 'Detection',
+    description:
+      'Mark the current moment in a running baseline. The node reports New/Gone/Moved/Both when it ends.',
+    defaultTarget: '@ALL',
+    parameters: [],
+  },
+  {
+    name: 'BASELINE_RESET',
+    group: 'Detection',
+    description: 'Delete the learned baseline from memory and SD. Refused while a scan runs.',
+    defaultTarget: '@AH01',
+    parameters: [],
+  },
+  {
+    name: 'RANDOMIZATION_RESET',
+    group: 'Detection',
+    description: 'Delete saved randomized-MAC identities. Refused while a scan runs.',
+    defaultTarget: '@AH01',
+    parameters: [],
+  },
+  {
+    name: 'PCAP_AUTO',
+    group: 'Scanning',
+    description:
+      'Set or query the SD space for captures Sentinel starts after an attack. Omit the value to query.',
+    defaultTarget: '@AH01',
     parameters: [
       {
-        key: 'enabled',
-        label: 'Enabled',
-        type: 'select',
-        required: true,
-        options: [
-          { label: 'Enabled', value: '1' },
-          { label: 'Disabled', value: '0' },
-        ],
+        key: 'limits',
+        label: 'Budget,Floor (MB)',
+        type: 'text',
+        placeholder: '512,256',
+        helper: 'budgetMB 16-262144, floorMB 0-262144.',
       },
+    ],
+    examples: [{ target: '@AH01', params: ['512,256'] }],
+  },
+  {
+    name: 'SD_REPAIR',
+    group: 'Configuration',
+    description: 'Control SD card auto-repair. A repair erases the card. Omit the value to query.',
+    defaultTarget: '@AH01',
+    parameters: [
       {
         key: 'mode',
-        label: 'Scan Mode',
+        label: 'Mode',
+        type: 'select',
+        options: [
+          { label: 'Query', value: '' },
+          { label: 'ON - rebuild an unmountable card', value: 'ON' },
+          { label: 'OFF - never rebuild', value: 'OFF' },
+          { label: 'NOW - remount, rebuild only if mounting fails', value: 'NOW' },
+        ],
+      },
+    ],
+  },
+  {
+    name: 'SCHED_ADD',
+    group: 'Scanning',
+    description: 'Add a scheduled scan. The node needs a known time (GPS, RTC or web UI visit).',
+    defaultTarget: '@AH01',
+    parameters: [
+      {
+        key: 'block',
+        label: 'Schedule Block',
+        type: 'text',
+        placeholder: '2030-01-01T02:00|86400|/scan|mode=2&secs=600',
+        helper:
+          'start (node local time YYYY-MM-DDTHH:MM) | repeat seconds (0 or 600-2678400) | route (/scan, /sniffer or /drone) | options joined with &.',
+        required: true,
+      },
+    ],
+    examples: [{ target: '@AH01', params: ['2030-01-01T02:00|86400|/scan|mode=2&secs=600'] }],
+  },
+  {
+    name: 'SCHED_LIST',
+    group: 'Scanning',
+    description: 'Count scheduled scans. The node prints the list on its USB serial port.',
+    defaultTarget: '@AH01',
+    parameters: [],
+  },
+  {
+    name: 'SCHED_DEL',
+    group: 'Scanning',
+    description: 'Delete one scheduled scan by its position in SCHED_LIST.',
+    defaultTarget: '@AH01',
+    parameters: [
+      {
+        key: 'position',
+        label: 'Position',
+        type: 'number',
+        placeholder: '1',
+        required: true,
+        min: 1,
+        step: 1,
+      },
+    ],
+    examples: [{ target: '@AH01', params: ['1'] }],
+  },
+  {
+    name: 'CALIBRATE',
+    group: 'Triangulation',
+    description:
+      'Calibrate distance estimates against a reference device placed at a measured distance (30 second listen).',
+    defaultTarget: '@AH01',
+    parameters: [
+      {
+        key: 'mac',
+        label: 'Reference MAC',
+        type: 'text',
+        placeholder: 'AA:BB:CC:DD:EE:FF',
+        required: true,
+      },
+      {
+        key: 'meters',
+        label: 'Distance (meters)',
+        type: 'text',
+        placeholder: '5',
+        helper: '0.5 to 100.',
+        required: true,
+      },
+    ],
+    examples: [{ target: '@AH01', params: ['AA:BB:CC:DD:EE:FF', '5'] }],
+  },
+  {
+    name: 'CALIBRATE_RESET',
+    group: 'Triangulation',
+    description: 'Clear the calibration. Distances go back to the RF environment values.',
+    defaultTarget: '@AH01',
+    parameters: [],
+  },
+  {
+    name: 'VIBSCAN_SET',
+    group: 'Detection',
+    description: 'Start a scan automatically when the node is moved.',
+    defaultTarget: '@AH01',
+    parameters: [
+      {
+        key: 'on',
+        label: 'Movement Scan',
         type: 'select',
         required: true,
         options: [
+          { label: 'On', value: '1' },
           { label: 'Off', value: '0' },
-          { label: 'Device scan', value: '1' },
-          { label: 'Probe', value: '2' },
-          { label: 'Randomization', value: '3' },
-          { label: 'List scan', value: '4' },
-          { label: 'Drone', value: '5' },
-          { label: 'Deauth', value: '6' },
-          { label: 'Baseline', value: '7' },
-          { label: 'PCAP', value: '8' },
         ],
       },
       {
-        key: 'duration',
-        label: 'Duration (seconds)',
+        key: 'scan',
+        label: 'Scan',
+        type: 'select',
+        required: true,
+        options: [
+          { label: '0 - None', value: '0' },
+          { label: '1 - Device discovery', value: '1' },
+          { label: '2 - Probe', value: '2' },
+          { label: '3 - Randomized MAC tracer', value: '3' },
+          { label: '4 - Target scan (channels 1-11)', value: '4' },
+          { label: '5 - Drone', value: '5' },
+          { label: '6 - Deauth', value: '6' },
+          { label: '7 - Baseline', value: '7' },
+          { label: '8 - Packet capture (needs a length)', value: '8' },
+        ],
+      },
+      {
+        key: 'secs',
+        label: 'Scan Length (seconds)',
         type: 'number',
         placeholder: '60',
-        helper: '0 runs until stopped.',
         required: true,
         min: 0,
         max: 65535,
@@ -1477,31 +1501,142 @@ export const MESH_COMMANDS: CommandDefinition[] = [
         label: 'Cooldown (seconds)',
         type: 'number',
         placeholder: '300',
-        required: false,
+        helper: '5-86400. Empty keeps the current value.',
         min: 5,
         max: 86400,
         step: 1,
         suffix: 'sec',
       },
+      {
+        key: 'interrupt',
+        label: 'Interrupt Scheduled Scan',
+        type: 'select',
+        options: [
+          { label: 'Keep current', value: '' },
+          { label: 'No', value: '0' },
+          { label: 'Yes', value: '1' },
+        ],
+        helper: 'Needs a cooldown value.',
+      },
     ],
-    examples: [{ target: '@NODE_22', params: ['1', '2', '60', '300'] }],
+    examples: [{ target: '@AH01', params: ['1', '2', '60', '300'] }],
   },
   {
     name: 'VIBSCAN_STATUS',
-    group: 'Security',
-    description: 'Report vibration auto-scan settings.',
-    defaultTarget: '@NODE_22',
+    group: 'Detection',
+    description: 'Report the movement-scan settings.',
+    defaultTarget: '@AH01',
+    parameters: [],
+  },
+  {
+    name: 'DETECT_CLEAR',
+    group: 'Sentinel',
+    description: 'Clear all detector state and delete the detector logs on SD.',
+    defaultTarget: '@AH01',
+    parameters: [],
+  },
+  {
+    name: 'DETECT_COUNTS',
+    group: 'Sentinel',
+    description: 'Report internal detector counters.',
+    defaultTarget: '@AH01',
+    parameters: [],
+  },
+  {
+    name: 'RADIO_KNOWN_ADD',
+    group: 'Sentinel',
+    description: 'Mark a Meshtastic or MeshCore radio as known. The node stops alerting on it.',
+    defaultTarget: '@ALL',
+    parameters: [
+      {
+        key: 'mac',
+        label: 'Radio MAC',
+        type: 'text',
+        placeholder: 'AA:BB:CC:DD:EE:FF',
+        required: true,
+      },
+      {
+        key: 'type',
+        label: 'Radio Type',
+        type: 'select',
+        required: true,
+        options: [
+          { label: 'Meshtastic', value: 'Meshtastic' },
+          { label: 'MeshCore', value: 'MeshCore' },
+        ],
+      },
+      {
+        key: 'name',
+        label: 'Bluetooth Name (optional)',
+        type: 'text',
+        helper: 'Up to 31 characters. Empty uses the name the node last saw.',
+      },
+    ],
+    examples: [{ target: '@ALL', params: ['AA:BB:CC:DD:EE:FF', 'Meshtastic'] }],
+  },
+  {
+    name: 'RADIO_KNOWN_DEL',
+    group: 'Sentinel',
+    description: 'Remove a radio from the known list.',
+    defaultTarget: '@ALL',
+    parameters: [
+      {
+        key: 'mac',
+        label: 'Radio MAC',
+        type: 'text',
+        placeholder: 'AA:BB:CC:DD:EE:FF',
+        required: true,
+      },
+    ],
+    examples: [{ target: '@ALL', params: ['AA:BB:CC:DD:EE:FF'] }],
+  },
+  {
+    name: 'RADIO_KNOWN_CLEAR',
+    group: 'Sentinel',
+    description: 'Empty the known radio list.',
+    defaultTarget: '@AH01',
+    parameters: [],
+  },
+  {
+    name: 'SELF_RADIO_SET',
+    group: 'Sentinel',
+    description: 'Set the Bluetooth name prefix of the node own radio so it stops alerting on it.',
+    defaultTarget: '@AH01',
+    parameters: [
+      {
+        key: 'prefix',
+        label: 'Name Prefix',
+        type: 'text',
+        placeholder: 'Meshtastic',
+        helper: '1 to 12 characters, no spaces.',
+        required: true,
+      },
+    ],
+    examples: [{ target: '@AH01', params: ['Meshtastic'] }],
+  },
+  {
+    name: 'SELF_RADIO_CLEAR',
+    group: 'Sentinel',
+    description: 'Forget the own-radio prefix.',
+    defaultTarget: '@AH01',
+    parameters: [],
+  },
+  {
+    name: 'SELF_RADIO_GET',
+    group: 'Sentinel',
+    description: 'Report the own-radio prefix.',
+    defaultTarget: '@AH01',
     parameters: [],
   },
   {
     name: 'ATTACKER_TRILAT',
     group: 'Sentinel',
-    description: 'Toggle attacker trilateration.',
+    description: 'Turn on locating the source of a confirmed attack by triangulation.',
     defaultTarget: '@ALL',
     parameters: [
       {
         key: 'enabled',
-        label: 'Attacker Trilat',
+        label: 'Attacker Triangulation',
         type: 'select',
         required: true,
         options: [
@@ -1515,15 +1650,8 @@ export const MESH_COMMANDS: CommandDefinition[] = [
   {
     name: 'ATTACKER_TRILAT_STATUS',
     group: 'Sentinel',
-    description: 'Report attacker trilateration state.',
-    defaultTarget: '@NODE_22',
-    parameters: [],
-  },
-  {
-    name: 'DETECT_COUNTS',
-    group: 'Sentinel',
-    description: 'Report detector dataset counts.',
-    defaultTarget: '@NODE_22',
+    description: 'Report the attacker triangulation setting.',
+    defaultTarget: '@AH01',
     parameters: [],
   },
   {

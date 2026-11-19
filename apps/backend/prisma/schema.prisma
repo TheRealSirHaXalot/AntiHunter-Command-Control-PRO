@@ -47,6 +47,46 @@ model User {
   alertRules          AlertRule[]
   webhooks            Webhook[]
   updateLogs          UpdateLog[]
+  pushSubscriptions   PushSubscription[]
+}
+
+model RemoteAlertConfig {
+  id                  Int      @id @default(1)
+  tailscaleEnabled    Boolean  @default(false)
+  tsAuthKey           String?
+  tsHostname          String?
+  tsAllowedLogins     String[] @default([])
+  vapidPublicKey      String?
+  vapidPrivateKey     String?
+  vapidSubject        String?
+  ntfyEnabled         Boolean  @default(false)
+  ntfyUrl             String?
+  ntfyToken           String?
+  signalEnabled       Boolean  @default(false)
+  signalApiUrl        String?
+  signalNumber        String?
+  signalRecipients    String[] @default([])
+  matrixEnabled       Boolean  @default(false)
+  matrixHomeserverUrl String?
+  matrixAccessToken   String?
+  matrixRoomId        String?
+  matterEnabled       Boolean  @default(false)
+  matterLayout        String   @default("bridge")
+  matterInterface     String?
+  alertTiers         Json     @default("{}")
+  coordsUnencrypted   Boolean  @default(false)
+  updatedAt           DateTime @updatedAt
+}
+
+model PushSubscription {
+  endpoint  String   @id
+  p256dh    String
+  auth      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 enum Role {
@@ -339,7 +379,6 @@ model AlertRule {
 
   owner      User?              @relation(fields: [ownerId], references: [id])
   events     AlertEvent[]
-  webhooks   AlertRuleWebhook[]
   deliveries WebhookDelivery[]
 
   @@index([ownerId])
@@ -376,7 +415,6 @@ model Webhook {
   clientCert        String?
   clientKey         String?
   caBundle          String?
-  subscribedEvents  WebhookEventType[] @default([])
   enabled           Boolean            @default(true)
   ownerId           String?
   lastSuccessAt     DateTime?
@@ -385,24 +423,10 @@ model Webhook {
   updatedAt         DateTime           @updatedAt
 
   owner      User?               @relation(fields: [ownerId], references: [id])
-  rules      AlertRuleWebhook[]
   deliveries WebhookDelivery[]
 
   @@index([ownerId])
   @@index([enabled])
-}
-
-model AlertRuleWebhook {
-  id        String   @id @default(cuid())
-  ruleId    String
-  webhookId String
-  createdAt DateTime @default(now())
-
-  rule    AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
-  webhook Webhook   @relation(fields: [webhookId], references: [id], onDelete: Cascade)
-
-  @@unique([ruleId, webhookId])
-  @@index([webhookId])
 }
 
 model WebhookDelivery {

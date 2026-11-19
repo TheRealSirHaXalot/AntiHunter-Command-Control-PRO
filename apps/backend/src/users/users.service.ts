@@ -356,6 +356,7 @@ export class UsersService {
     }
     if (dto.password !== undefined) {
       data.passwordHash = await argon2.hash(dto.password);
+      data.passwordChangedAt = new Date();
     }
 
     let user = await this.prisma.user.findUnique({

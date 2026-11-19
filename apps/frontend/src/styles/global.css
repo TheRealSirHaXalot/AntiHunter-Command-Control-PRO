@@ -28,6 +28,19 @@
   color: var(--color-text-muted);
   line-height: 1.45;
 }
+.config-hint--warn {
+  color: #f87171;
+}
+.webhook-advanced > summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.35rem 0;
+  color: var(--color-text-muted);
+}
+.webhook-advanced[open] > summary {
+  margin-bottom: 0.5rem;
+}
 :root {
   color-scheme: light;
   font-family:
@@ -3829,6 +3842,29 @@ body.theme-dark .control-chip[disabled] {
 .form-grid .control-input {
   width: 100%;
 }
+.info-button {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.35rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 1rem;
+  vertical-align: middle;
+  cursor: pointer;
+}
+.info-button:hover,
+.info-button[aria-expanded='true'] {
+  color: var(--color-text);
+}
+.form-field .field-help,
+.form-grid label .field-help {
+  font-size: 0.78rem;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
 .account-header {
   display: flex;
   align-items: center;
@@ -3930,6 +3966,20 @@ body.theme-dark .control-chip[disabled] {
 }
 .data-table tr.is-inactive {
   opacity: 0.55;
+}
+.alert-sources-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+.alert-sources-table th:not(:first-child),
+.alert-sources-table td:not(:first-child) {
+  width: 5.5rem;
+  text-align: center;
+}
+.alert-sources-table th:first-child,
+.alert-sources-table td:first-child {
+  width: auto;
+  overflow-wrap: anywhere;
 }
 .admin-create-user {
   margin-top: 1rem;
@@ -6227,6 +6277,116 @@ body.theme-dark .strategy-table__row--selected {
 .baseline-legend {
   margin-top: 0.6rem;
 }
+.remote-subsection {
+  padding: 1.35rem 1.5rem;
+  margin-top: 1rem;
+  border-radius: 0.75rem;
+  background: rgba(148, 163, 184, 0.06);
+}
+.remote-subsection:first-child {
+  margin-top: 0;
+}
+.channel-row__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+.channel-row__head h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+.remote-subsection > * + *,
+.remote-subsection > div > * + * {
+  margin-top: 0.85rem;
+}
+.remote-subsection label + label {
+  margin-top: 0.85rem;
+}
+.remote-subsection .field-hint {
+  margin-top: 0.25rem;
+}
+.remote-subsection .control-checkbox,
+.remote-subsection .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.remote-subsection .controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.remote-subsection .controls-row > * {
+  margin-top: 0;
+}
+.remote-subsection .form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.85rem 1rem;
+  align-items: start;
+}
+.remote-subsection .form-grid > label,
+.remote-subsection .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.remote-subsection .form-grid > label {
+  margin: 0;
+}
+.remote-subsection .form-grid > label > span,
+.remote-subsection .form-field > span {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  min-height: 1.1rem;
+}
+.remote-subsection .control-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.config-steps {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+.config-steps code {
+  display: inline-block;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 0.78rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.35rem;
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--color-text);
+}
+.alert-sources-table th:not(:first-child),
+.alert-sources-table td:not(:first-child) {
+  width: 5.5rem;
+  text-align: center;
+}
+.alert-sources-table tbody tr:nth-child(even) td {
+  background: rgba(148, 163, 184, 0.06);
+}
+.alert-sources-table .alert-group-row td {
+  background: rgba(var(--color-accent-rgb), 0.1);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  padding: 0.4rem 0.75rem;
+}
+.alert-sources-table input[type='checkbox'] {
+  cursor: pointer;
+}
+
 /* Config pages — ops-console (Retool/Grafana), scoped to .config-grid, theme-token driven */
 .config-grid {
   gap: 0.9rem;
@@ -6261,6 +6421,13 @@ body.theme-dark .strategy-table__row--selected {
 .config-grid .config-card__body {
   padding: 1rem;
   gap: 0.9rem;
+}
+.config-grid .channel-row__head h3 {
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
 }
 .config-grid .control-chip {
   height: 2rem;

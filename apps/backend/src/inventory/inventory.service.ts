@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { InventoryDevice, Prisma } from '@prisma/client';
 import { Observable, Subject } from 'rxjs';
 
+import { loadSignatures, matchSignatures } from './device-signatures';
 import { classifyDeviceType } from '../device-classification/device-class';
 import { DronesService } from '../drones/drones.service';
 import { OuiService } from '../oui/oui.service';
@@ -281,8 +282,12 @@ export class InventoryService {
       orderBy: [{ hits: 'desc' }, { lastSeen: 'desc' }],
       take: options.limit ?? 200,
     });
+    const catalog = loadSignatures();
     return devices.map((device) => ({
       ...device,
+      signatures: catalog
+        ? matchSignatures(catalog, { mac: device.mac, type: device.type, name: device.ssid })
+        : [],
       classification: classifyInventoryDevice(device),
     }));
   }

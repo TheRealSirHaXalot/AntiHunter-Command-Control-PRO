@@ -1,15 +1,30 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateSiteDto } from './dto/update-site.dto';
 
 @Injectable()
-export class SitesService {
+export class SitesService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {}
+
+  // Site-scoped writes such as the login firewall log need the SITE_ID row, also after SITE_ID changes post-seed.
+  async onModuleInit() {
+    const id = this.config.get<string>('site.id', 'default');
+    const name = process.env.SITE_NAME?.trim() || (id === 'default' ? 'Default Site' : id);
+    try {
+      await this.prisma.site.upsert({
+        where: { id },
+        update: {},
+        create: { id, name, color: '#2E7D32' },
+      });
+    } catch (err) {
+      if ((err as { code?: string }).code !== 'P2002') throw err;
+    }
+  }
 
   list() {
     return this.prisma.site.findMany();

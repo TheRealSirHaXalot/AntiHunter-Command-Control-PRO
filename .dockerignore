@@ -12,3 +12,10 @@ tmp
 Thumbs.db
 *.log
 pnpm-debug.log*
+**/.env
+**/.env.*
+!**/.env.example
+**/.secrets
+**/.matter
+apps/backend/bin
+apps/backend/backups

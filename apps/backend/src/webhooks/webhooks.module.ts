@@ -4,9 +4,10 @@ import { WebhookDispatcherService } from './webhook-dispatcher.service';
 import { WebhooksController } from './webhooks.controller';
 import { WebhooksService } from './webhooks.service';
 import { PrismaModule } from '../prisma/prisma.module';
+import { PushModule } from '../push/push.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, PushModule],
   controllers: [WebhooksController],
   providers: [WebhooksService, WebhookDispatcherService],
   exports: [WebhooksService, WebhookDispatcherService],

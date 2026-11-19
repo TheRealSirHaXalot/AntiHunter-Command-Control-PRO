@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AlarmLevel, Prisma, WebhookEventType } from '@prisma/client';
+import { AlarmLevel, Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { createReadStream, existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -20,6 +20,7 @@ import {
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { WebhookDispatcherService } from '../webhooks/webhook-dispatcher.service';
+import { WebhookEventType } from '../webhooks/webhook-event-type';
 import { CommandCenterGateway } from '../ws/command-center.gateway';
 
 function validateFeedUrl(urlString: string): string {
@@ -328,7 +329,6 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       mapColor: payload.mapColor ?? null,
       mapLabel: payload.mapLabel ?? null,
       blink: payload.blink ?? false,
-      webhookIds: payload.webhookIds ?? [],
       messageTemplate: payload.messageTemplate ?? null,
     };
     rule.alertRuleId = await this.syncAlertRuleToDb(rule).catch((error) => {
@@ -358,7 +358,6 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       mapColor: patch.mapColor ?? this.alertRules[idx].mapColor ?? null,
       mapLabel: patch.mapLabel ?? this.alertRules[idx].mapLabel ?? null,
       blink: patch.blink ?? this.alertRules[idx].blink ?? false,
-      webhookIds: patch.webhookIds ?? this.alertRules[idx].webhookIds ?? [],
       messageTemplate: patch.messageTemplate ?? this.alertRules[idx].messageTemplate ?? null,
       id,
       updatedAt: new Date().toISOString(),
@@ -1687,36 +1686,31 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
       { skipBus: false },
     );
 
-    if (rule.webhookIds && rule.webhookIds.length > 0) {
-      await this.webhookDispatcher.dispatchAlert(
-        rule.webhookIds.map((webhookId) => ({ webhookId }) as never),
-        {
-          eventType: WebhookEventType.ALERT_TRIGGERED,
-          event: 'alert.triggered',
-          ruleId: rule.id,
-          ruleName: rule.name,
-          severity: rule.severity,
-          message,
-          lat: lat ?? null,
-          lon: lon ?? null,
-          payload: {
-            callsign,
-            icao,
-            reg,
-            dep,
-            dest,
-            speed,
-            alt,
-            label,
-            freq,
-            signal,
-            noise,
-            kind,
-          },
-          timestamp: new Date(),
-        },
-      );
-    }
+    await this.webhookDispatcher.dispatchAlert({
+      eventType: WebhookEventType.ALERT_TRIGGERED,
+      event: 'alert.triggered',
+      ruleId: rule.id,
+      ruleName: rule.name,
+      severity: rule.severity,
+      message,
+      lat: lat ?? null,
+      lon: lon ?? null,
+      payload: {
+        callsign,
+        icao,
+        reg,
+        dep,
+        dest,
+        speed,
+        alt,
+        label,
+        freq,
+        signal,
+        noise,
+        kind,
+      },
+      timestamp: new Date(),
+    });
 
     if (rule.notifyEmail && rule.emailRecipients && rule.emailRecipients.length > 0) {
       const bodyLines = [
@@ -1871,13 +1865,6 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
           emailRecipients: rule.emailRecipients ?? [],
           messageTemplate: rule.messageTemplate ?? null,
           mapStyle: mapStyle ? (mapStyle as Prisma.InputJsonValue) : Prisma.JsonNull,
-          webhooks: rule.webhookIds?.length
-            ? {
-                create: rule.webhookIds.map((webhookId) => ({
-                  webhook: { connect: { id: webhookId } },
-                })),
-              }
-            : undefined,
         },
         update: {
           name: rule.name,
@@ -1890,16 +1877,6 @@ export class AdsbService implements OnModuleInit, OnModuleDestroy {
           emailRecipients: rule.emailRecipients ?? [],
           messageTemplate: rule.messageTemplate ?? null,
           mapStyle: mapStyle ? (mapStyle as Prisma.InputJsonValue) : Prisma.JsonNull,
-          webhooks: {
-            deleteMany: {},
-            ...(rule.webhookIds?.length
-              ? {
-                  create: rule.webhookIds.map((webhookId) => ({
-                    webhook: { connect: { id: webhookId } },
-                  })),
-                }
-              : {}),
-          },
         },
       });
       return result.id;

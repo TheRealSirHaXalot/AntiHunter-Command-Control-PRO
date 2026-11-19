@@ -357,7 +357,7 @@ export class AuthService {
     const payload = jwt.verify(token, this.jwtSecret) as AuthTokenPayload;
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { passwordChangedAt: true, isActive: true },
+      select: { passwordChangedAt: true, isActive: true, role: true },
     });
     if (!user) {
       throw new UnauthorizedException('Account no longer exists');
@@ -371,7 +371,7 @@ export class AuthService {
     ) {
       throw new UnauthorizedException('Session ended by password change');
     }
-    return payload;
+    return { ...payload, role: user.role };
   }
 
   async getUserFeatures(userId: string, role: Role): Promise<string[]> {

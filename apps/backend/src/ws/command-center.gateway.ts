@@ -223,6 +223,7 @@ export class CommandCenterGateway
     }
     try {
       const meta = {
+        role: (client.data?.role as string | undefined) ?? null,
         ip: (client.handshake.address as string | undefined) ?? null,
         userAgent: (client.handshake.headers['user-agent'] as string | undefined) ?? null,
         fingerprint: client.id,

@@ -60,7 +60,7 @@ RUN pnpm --filter @command-center/backend exec prisma generate \
 COPY docker/backend-entrypoint.sh ./backend-entrypoint.sh
 RUN sed -i 's/\r$//' ./backend-entrypoint.sh && chmod +x ./backend-entrypoint.sh
 
-RUN mkdir -p /app/data/tiles /app/apps/backend/.secrets /app/.npm-cache \
+RUN mkdir -p /app/data/matter /app/data/tiles /app/apps/backend/.secrets /app/.npm-cache \
   && chown -R node:node /app/apps/backend /app/data /app/.npm-cache \
     /app/node_modules/.pnpm/prisma@* /app/node_modules/.pnpm/@prisma+client@*
 

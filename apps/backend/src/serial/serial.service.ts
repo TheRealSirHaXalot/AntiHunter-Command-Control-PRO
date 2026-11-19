@@ -21,6 +21,16 @@ import {
   SecurityConfigView,
   SecurityUpdate,
 } from './fleet-admin.types';
+import {
+  encodeMeshcoreFrame,
+  MC,
+  meshcoreAppStart,
+  meshcoreChannelMessage,
+  meshcoreChannelText,
+  MeshcoreFrameParser,
+  MeshcoreReplyJoiner,
+  meshcoreTextCap,
+} from './meshcore-frame-parser';
 import { MeshtasticFrameEvent, MeshtasticFrameParser } from './meshtastic-frame-parser';
 import { createParser, ProtocolKey } from './protocol-registry';
 import {
@@ -34,14 +44,16 @@ import { SerialConfigService } from './serial-config.service';
 import { SERIAL_DELIMITER_CANDIDATES } from './serial.config.defaults';
 import { SerialConnectionOptions, SerialState } from './serial.interfaces';
 import { SerialParseResult, SerialProtocolParser } from './serial.types';
-import { buildCommandPayload } from '../commands/command-builder';
+import { buildCommandPayload, redactCommandParams } from '../commands/command-builder';
 
 const Binding = resolveBinding();
 const dynamicImport = new Function('specifier', 'return import(specifier);') as <TModule>(
   specifier: string,
 ) => Promise<TModule>;
 
-type MeshProtoModule = typeof import('@meshtastic/protobufs');
+type MeshProtoModule = typeof import('@meshtastic/protobufs', {
+  with: { 'resolution-mode': 'import' },
+});
 let meshProtoModulePromise: Promise<MeshProtoModule> | null = null;
 
 function resolveBinding(): AutoDetectTypes {
@@ -314,6 +326,10 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
   private readonly seenPacketIds = new Map<number, number>();
   private readonly PACKET_ID_TTL_MS = 30000;
   private frameParser?: MeshtasticFrameParser;
+  private meshcoreParser?: MeshcoreFrameParser;
+  private meshcoreCap: number = MC.DEFAULT_TEXT_CAP;
+  private meshcoreReply?: (code: number) => void;
+  private readonly meshcoreJoiner = new MeshcoreReplyJoiner((text) => this.handleMeshText(text));
   private readonly meshNodeNames = new Map<number, string>();
   private localRadio: LocalRadioInfo = {};
   private radioConfig: Record<string, unknown> = {};
@@ -1236,7 +1252,10 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     });
     const line = request.line ?? built.line;
 
-    this.logger.debug(`Queueing command line: ${line}`);
+    const sensitive = redactCommandParams(built.name, built.params) !== built.params;
+    this.logger.debug(
+      `Queueing command line: ${sensitive ? `${built.target} ${built.name}:***` : line}`,
+    );
 
     const isStopCommand = built.name === 'STOP';
     if (isStopCommand) {
@@ -1265,7 +1284,9 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
         this.connectionOptions?.hopLimit ?? this.configService.get<number>('serial.hopLimit');
 
       const isMeshtasticRadio = this.localRadio.num !== undefined;
-      if (isMeshtasticRadio && sendMode !== 'plain') {
+      if (sendMode === 'meshcore') {
+        await this.sendMeshcoreCommand(line);
+      } else if (isMeshtasticRadio && sendMode !== 'plain') {
         await this.sendMeshtasticCommand(line, {
           wantAck: false,
           hopLimit: Number.isFinite(hopLimit) ? (hopLimit as number) : undefined,
@@ -1290,6 +1311,13 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
       this.frameParser.removeAllListeners();
       this.frameParser = undefined;
     }
+    if (this.meshcoreParser) {
+      this.meshcoreParser.removeAllListeners();
+      this.meshcoreParser = undefined;
+    }
+    this.meshcoreReply?.(-1);
+    this.meshcoreJoiner.flush();
+    this.meshcoreCap = MC.DEFAULT_TEXT_CAP;
     if (this.port) {
       this.port.removeAllListeners();
     }
@@ -1417,6 +1445,99 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     await this.writeBuffer(buffer);
   }
 
+  private sendChannelIndex(): number {
+    const channelConfig =
+      this.connectionOptions?.sendChannel ??
+      this.configService.get<number>('serial.commandChannel') ??
+      this.configService.get<number>('serial.sendChannel') ??
+      0;
+    return Number.isFinite(channelConfig) ? Number(channelConfig) : 0;
+  }
+
+  private async startMeshcore(): Promise<void> {
+    await this.writeBuffer(encodeMeshcoreFrame(meshcoreAppStart('AHCC')));
+    await this.meshcoreSyncNext();
+    this.logger.log('MeshCore companion handshake sent');
+  }
+
+  private meshcoreSyncNext(): Promise<void> {
+    return this.writeBuffer(encodeMeshcoreFrame(Buffer.from([MC.CMD_SYNC_NEXT])));
+  }
+
+  private handleMeshcoreFrame(frame: Buffer): void {
+    switch (frame[0]) {
+      case MC.RESP_OK:
+      case MC.RESP_ERR: {
+        const reply = this.meshcoreReply;
+        this.meshcoreReply = undefined;
+        reply?.(frame[0]);
+        return;
+      }
+      case MC.RESP_SELF_INFO: {
+        const cap = meshcoreTextCap(frame);
+        if (cap !== undefined) this.meshcoreCap = cap;
+        this.logger.log(`MeshCore radio answered, text limit ${this.meshcoreCap} bytes`);
+        return;
+      }
+      case MC.PUSH_MSG_WAITING:
+      case MC.RESP_CONTACT_MSG:
+      case MC.RESP_CONTACT_MSG_V3:
+      case MC.RESP_CHANNEL_DATA:
+        void this.meshcoreSyncNext().catch((err) =>
+          this.logger.warn(`MeshCore sync: ${err instanceof Error ? err.message : err}`),
+        );
+        return;
+      case MC.RESP_CHANNEL_MSG:
+      case MC.RESP_CHANNEL_MSG_V3: {
+        void this.meshcoreSyncNext().catch((err) =>
+          this.logger.warn(`MeshCore sync: ${err instanceof Error ? err.message : err}`),
+        );
+        const msg = meshcoreChannelMessage(frame);
+        if (msg?.text && msg.channel === this.sendChannelIndex()) {
+          this.meshcoreJoiner.push(msg.text);
+        }
+        return;
+      }
+      default:
+        return;
+    }
+  }
+
+  private async sendMeshcoreCommand(line: string): Promise<void> {
+    this.ensureConnected();
+    const text = Buffer.from(line.trim(), 'utf8');
+    if (!text.length) {
+      return;
+    }
+    if (text.length > this.meshcoreCap) {
+      throw new BadRequestException(
+        `Command is ${text.length} bytes; the MeshCore radio limit is ${this.meshcoreCap}`,
+      );
+    }
+    const reply = new Promise<number>((resolve) => {
+      const timer = setTimeout(() => {
+        this.meshcoreReply = undefined;
+        resolve(-1);
+      }, 2000);
+      this.meshcoreReply = (code) => {
+        clearTimeout(timer);
+        resolve(code);
+      };
+    });
+    const epoch = Math.floor(Date.now() / 1000);
+    await this.writeBuffer(
+      encodeMeshcoreFrame(meshcoreChannelText(this.sendChannelIndex(), epoch, text)),
+    );
+    const code = await reply;
+    if (code !== MC.RESP_OK) {
+      throw new Error(
+        code === MC.RESP_ERR
+          ? 'MeshCore radio rejected the send (queue full or channel not set)'
+          : 'MeshCore radio did not answer the send',
+      );
+    }
+  }
+
   private async sendMeshtasticCommand(
     line: string,
     options?: { wantAck?: boolean; hopLimit?: number },
@@ -1429,12 +1550,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
 
     const { Mesh, Portnums } = await loadMeshModule();
 
-    const channelConfig =
-      this.connectionOptions?.sendChannel ??
-      this.configService.get<number>('serial.commandChannel') ??
-      this.configService.get<number>('serial.sendChannel') ??
-      0;
-    const channelIndex = Number.isFinite(channelConfig) ? Number(channelConfig) : 0;
+    const channelIndex = this.sendChannelIndex();
 
     const payload = Buffer.from(trimmed, 'utf8');
     const decoded = create(Mesh.DataSchema, {
@@ -1634,46 +1750,55 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     this.protocolParser = createParser(options.protocol);
     this.protocolParser.reset();
 
-    // Always frame + handshake so a Meshtastic radio is detected regardless of protocol; text falls through to the protocol parser.
-    this.frameParser = new MeshtasticFrameParser();
-    this.port.pipe(this.frameParser);
+    const sendMode = (
+      options.sendMode ??
+      this.configService.get<string>('serial.sendMode') ??
+      'protobuf'
+    ).toLowerCase();
 
-    this.frameParser.on('data', (event: MeshtasticFrameEvent) => {
-      if (event.type === 'frame') {
-        this.logger.log(`[FRAME] protobuf ${(event.data as Buffer).length}B`);
-        void this.handleMeshtasticFrame(event.data);
-      } else if (event.type === 'text') {
-        if (this.localRadio.num !== undefined) return;
-        const line = (event.data as string).trim();
-        if (!line) return;
-        if (this.heldTextLines) {
-          this.heldTextLines.push(line);
-          return;
-        }
-        this.logger.log(`[TEXT] ${line.slice(0, 200)}`);
-        this.processIncomingLine(line, 'serial');
-      }
-    });
-
-    this.frameParser.on('error', (err: Error) => {
-      this.logger.error(`Frame parser error: ${err.message}`, err.stack);
-    });
-
-    const plainMode =
-      (
-        options.sendMode ??
-        this.configService.get<string>('serial.sendMode') ??
-        'protobuf'
-      ).toLowerCase() === 'plain';
-    if (!plainMode) {
-      void this.identifyRadioWithRetry();
-    }
-
-    this.radioHeartbeatTimer = setInterval(() => {
-      void this.sendRadioHeartbeat().catch((err) =>
-        this.logger.warn(`Meshtastic keepalive: ${err instanceof Error ? err.message : err}`),
+    if (sendMode === 'meshcore') {
+      this.meshcoreParser = new MeshcoreFrameParser();
+      this.port.pipe(this.meshcoreParser);
+      this.meshcoreParser.on('data', (frame: Buffer) => this.handleMeshcoreFrame(frame));
+      void this.startMeshcore().catch((err) =>
+        this.logger.warn(`MeshCore handshake: ${err instanceof Error ? err.message : err}`),
       );
-    }, 15 * 1000);
+    } else {
+      // Always frame + handshake so a Meshtastic radio is detected regardless of protocol; text falls through to the protocol parser.
+      this.frameParser = new MeshtasticFrameParser();
+      this.port.pipe(this.frameParser);
+
+      this.frameParser.on('data', (event: MeshtasticFrameEvent) => {
+        if (event.type === 'frame') {
+          this.logger.log(`[FRAME] protobuf ${(event.data as Buffer).length}B`);
+          void this.handleMeshtasticFrame(event.data);
+        } else if (event.type === 'text') {
+          if (this.localRadio.num !== undefined) return;
+          const line = (event.data as string).trim();
+          if (!line) return;
+          if (this.heldTextLines) {
+            this.heldTextLines.push(line);
+            return;
+          }
+          this.logger.log(`[TEXT] ${line.slice(0, 200)}`);
+          this.processIncomingLine(line, 'serial');
+        }
+      });
+
+      this.frameParser.on('error', (err: Error) => {
+        this.logger.error(`Frame parser error: ${err.message}`, err.stack);
+      });
+
+      if (sendMode !== 'plain') {
+        void this.identifyRadioWithRetry();
+      }
+
+      this.radioHeartbeatTimer = setInterval(() => {
+        void this.sendRadioHeartbeat().catch((err) =>
+          this.logger.warn(`Meshtastic keepalive: ${err instanceof Error ? err.message : err}`),
+        );
+      }, 15 * 1000);
+    }
 
     this.port.on('error', (err) => {
       this.lastError = err.message;
@@ -1765,6 +1890,25 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     for (const line of held) {
       this.logger.log(`[TEXT] ${line.slice(0, 200)}`);
       this.processIncomingLine(line, 'serial');
+    }
+  }
+
+  private handleMeshText(text: string): void {
+    this.incoming$.next(text);
+
+    const parsed = text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .flatMap((line) => this.protocolParser.parseLine(line));
+    if (parsed.length > 0) {
+      this.logger.debug({ parsed }, 'Parsed mesh text events');
+      parsed.forEach((event) => this.parsed$.next(event));
+      this.broadcastParsedEvents(parsed);
+    } else {
+      const rawEvent: SerialParseResult = { kind: 'raw', raw: text };
+      this.parsed$.next(rawEvent);
+      this.broadcastParsedEvents([rawEvent]);
     }
   }
 
@@ -1931,22 +2075,7 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
         if (!text) return;
 
         this.logger.debug({ text, from: nodeName, rssi }, 'Meshtastic text message');
-        this.incoming$.next(text);
-
-        const parsed = text
-          .split(/\r?\n/)
-          .map((line) => line.trim())
-          .filter(Boolean)
-          .flatMap((line) => this.protocolParser.parseLine(line));
-        if (parsed.length > 0) {
-          this.logger.debug({ parsed }, 'Parsed protobuf text events');
-          parsed.forEach((event) => this.parsed$.next(event));
-          this.broadcastParsedEvents(parsed);
-        } else {
-          const rawEvent: SerialParseResult = { kind: 'raw', raw: text };
-          this.parsed$.next(rawEvent);
-          this.broadcastParsedEvents([rawEvent]);
-        }
+        this.handleMeshText(text);
         break;
       }
 
@@ -2686,7 +2815,7 @@ function sanitizeLine(value: string): string {
   }
 
   // Strip Meshtastic TEXTMSG channel prefix: "0:" or "1 :" (channel 0-7)
-  const chanMatch = /^\s*(\d)\s*:\s*(.+)$/.exec(cleaned);
+  const chanMatch = /^\s*(\d)\s*:\s*([\s\S]+)$/.exec(cleaned);
   if (chanMatch && chanMatch[1].length === 1 && Number(chanMatch[1]) <= 7) {
     cleaned = chanMatch[2].trim();
   }
@@ -2697,7 +2826,7 @@ function sanitizeLine(value: string): string {
   // and the hop adds "relayName: " in front. We detect by checking if the second
   // token is a plain node ID (not a keyword) and the third token IS a keyword.
   const HOP_KEYWORD_RE =
-    /^(?:STATUS|SUMMARY|Target|DEVICE|DRONE|ATTACK|ANOMALY|VIBRATION|VIBRATION_STATUS|VIBRATION_ON_ACK|VIBRATION_OFF_ACK|SETUP_MODE|SETUP_COMPLETE|TAMPER_DETECTED|TAMPER_CANCELLED|ERASE_|AUTOERASE_|BASELINE_STATUS|BASELINE_ACK|BATTERY_SAVER_STATUS|BATTERY_SAVER_START_ACK|BATTERY_SAVER_STOP_ACK|HEARTBEAT|STARTUP|GPS|TRIANGULATE|TARGET_DATA|T_D:|T_C:|T_F:|IDENTITY|RANDOMIZATION|RANDOMIZATION_DONE|SCAN_DONE|DEAUTH_DONE|DRONE_DONE|BASELINE_DONE|LIST_SCAN_DONE|PROBE_DONE|PROBE_HIT|PROBE_ACK|PCAP_|SCAN_ACK|DEVICE_SCAN_ACK|DRONE_ACK|DEAUTH_ACK|CONFIG_ACK|STOP_ACK|REBOOT_ACK|HB_ACK|TRI_START|WIPE_TOKEN|ERASE_TOKEN|RTC_SYNC|TIME_SYNC|CODES:|EVILTWIN|OWE_ABUSE|PMKID_|EAPOL_BAIT|HSHK|KARMA_|PWNAGOTCHI|PROBE_FLOOD|SAE_DOS|DEAUTH_FLOOD|DEAUTH_FORGE|DEAUTH_AP_TARGETED|BEACON_|ASSOC_SLEEP|AUTH_FLOOD|SSID_CONFUSION|FRAG|ATTACKER_HUNT|RECON|JAMMING|SENTINEL|GROUP_ACK|DETECT_CFG|INCIDENTS|DEDUP_CLEAR_ACK|FACTORY_RESET|MESH_SPOOF_SELF|MESH_FLOOD|MESH_CMD_INJECT|DEVICE_DISAPPEARED|RID_|TOF_|BLOOM|IDHASH|CHAN_ASSIGN|CSI_|CAMPAIGN_|SCHED_|BASELINE_WATCH|BASELINE_RESET|PROBE_DB_CLEAR|CALIBRATE_|BATTERY_SAVER|RADIO_DETECTED|RADIO_KNOWN_|CSA_SPOOF|QUIET_ABUSE|VIBSCAN_|ATTACKER_TRILAT|DETECT_|QUORUM_|HUNT_COOLDOWN|MESH_TX_CANCEL|SD_REPAIR|TRI_ACK|Time:)/i;
+    /^(?:STATUS|Target|DEVICE|DRONE|ATTACK|ANOMALY|VIBRATION|VIBRATION_STATUS|VIBRATION_ON_ACK|VIBRATION_OFF_ACK|SETUP_MODE|SETUP_COMPLETE|TAMPER_DETECTED|TAMPER_CANCELLED|ERASE_|AUTOERASE_|BASELINE_STATUS|BASELINE_ACK|BATTERY_SAVER_STATUS|BATTERY_SAVER_START_ACK|BATTERY_SAVER_STOP_ACK|HEARTBEAT|STARTUP|GPS|TRIANGULATE|TARGET_DATA|T_D:|T_C:|T_F:|IDENTITY|RANDOMIZATION|RANDOMIZATION_DONE|SCAN_DONE|DEAUTH_DONE|DRONE_DONE|BASELINE_DONE|LIST_SCAN_DONE|PROBE_DONE|PROBE_HIT|PROBE_ACK|PCAP_|SCAN_ACK|DEVICE_SCAN_ACK|DRONE_ACK|DEAUTH_ACK|CONFIG_ACK|STOP_ACK|REBOOT_ACK|HB_ACK|TRI_START|WIPE_TOKEN|ERASE_TOKEN|RTC_SYNC|TIME_SYNC|CODES:|EVILTWIN|OWE_ABUSE|PMKID_|EAPOL_BAIT|HSHK|KARMA_|PWNAGOTCHI|PROBE_FLOOD|SAE_DOS|DEAUTH_FLOOD|DEAUTH_FORGE|DEAUTH_AP_TARGETED|BEACON_|ASSOC_SLEEP|AUTH_FLOOD|SSID_CONFUSION|FRAG|ATTACKER_HUNT|RECON|JAMMING|SENTINEL|GROUP_ACK|DETECT_CFG|INCIDENTS|DEDUP_CLEAR_ACK|FACTORY_RESET|MESH_SPOOF_SELF|MESH_FLOOD|MESH_CMD_INJECT|DEVICE_DISAPPEARED|RID_|TOF_|BLOOM|IDHASH|CHAN_ASSIGN|CSI_|SUMMARY|CAMPAIGN_|SCHED_|CALIBRATE_|SELF_RADIO_|RADIO_KNOWN_|RADIO_DETECTED|CSA_SPOOF|QUIET_ABUSE|FLEET_|VIBSCAN_|ATTACKER_TRILAT|MESH_TX_CANCEL|DEVICE_DB_CLEAR|PROBE_DB_CLEAR|BASELINE_RESET|BASELINE_WATCH|RANDOMIZATION_RESET|DETECT_CLEAR|DETECT_COUNTS|SD_REPAIR|BATTERY_SAVER|DETECT_|QUORUM_|HUNT_COOLDOWN|TRI_ACK|Time:)/i;
   const hopMatch = /^([A-Za-z0-9_-]{1,6}):\s+([A-Za-z0-9_.:-]+:\s+)(.+)$/i.exec(cleaned);
   if (hopMatch) {
     const secondToken = hopMatch[2].replace(/[:\s]+$/, '');

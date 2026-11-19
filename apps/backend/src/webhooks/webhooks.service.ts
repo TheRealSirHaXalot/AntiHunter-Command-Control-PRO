@@ -5,7 +5,7 @@
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, Role, WebhookEventType } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 
 import { CreateWebhookDto } from './dto/create-webhook.dto';
 import { UpdateWebhookDto } from './dto/update-webhook.dto';
@@ -13,24 +13,9 @@ import { WebhookDispatcherService } from './webhook-dispatcher.service';
 import { WebhookDto } from './webhook.dto';
 import { PrismaService } from '../prisma/prisma.service';
 
-const AVAILABLE_WEBHOOK_EVENTS: WebhookEventType[] = [
-  WebhookEventType.ALERT_TRIGGERED,
-  WebhookEventType.INVENTORY_UPDATED,
-  WebhookEventType.NODE_TELEMETRY,
-  WebhookEventType.TARGET_DETECTED,
-  WebhookEventType.NODE_ALERT,
-  WebhookEventType.DRONE_TELEMETRY,
-  WebhookEventType.COMMAND_ACK,
-  WebhookEventType.COMMAND_RESULT,
-  WebhookEventType.SERIAL_RAW,
-];
-
 const webhookInclude = {
   owner: {
     select: { id: true, email: true, firstName: true, lastName: true },
-  },
-  rules: {
-    select: { ruleId: true },
   },
   deliveries: {
     orderBy: { createdAt: 'desc' },
@@ -71,7 +56,6 @@ export class WebhooksService {
     if (dto.shareWithEveryone && role !== Role.ADMIN) {
       throw new ForbiddenException('ONLY_ADMIN_CAN_SHARE_WEBHOOKS');
     }
-    const subscribedEvents = this.normalizeEvents(dto.subscribedEvents);
     const hook = await this.prisma.webhook.create({
       data: {
         name: dto.name.trim(),
@@ -81,7 +65,6 @@ export class WebhooksService {
         clientCert: this.normalizePem(dto.clientCertificate),
         clientKey: this.normalizePem(dto.clientKey),
         caBundle: this.normalizePem(dto.caBundle),
-        subscribedEvents,
         enabled: dto.enabled ?? true,
         ownerId: dto.shareWithEveryone ? null : userId,
       },
@@ -97,10 +80,6 @@ export class WebhooksService {
     if (dto.shareWithEveryone && role !== Role.ADMIN) {
       throw new ForbiddenException('ONLY_ADMIN_CAN_SHARE_WEBHOOKS');
     }
-    const subscribedEvents = dto.subscribedEvents
-      ? this.normalizeEvents(dto.subscribedEvents)
-      : existing.subscribedEvents;
-
     const updated = await this.prisma.webhook.update({
       where: { id },
       data: {
@@ -115,7 +94,6 @@ export class WebhooksService {
         clientKey:
           dto.clientKey !== undefined ? this.normalizePem(dto.clientKey) : existing.clientKey,
         caBundle: dto.caBundle !== undefined ? this.normalizePem(dto.caBundle) : existing.caBundle,
-        subscribedEvents,
         enabled: dto.enabled ?? existing.enabled,
         ownerId:
           dto.shareWithEveryone !== undefined
@@ -168,15 +146,6 @@ export class WebhooksService {
     };
   }
 
-  private normalizeEvents(events?: WebhookEventType[]): WebhookEventType[] {
-    if (!events?.length) {
-      return [WebhookEventType.ALERT_TRIGGERED];
-    }
-    const filtered = events.filter((event) => AVAILABLE_WEBHOOK_EVENTS.includes(event));
-    const unique = Array.from(new Set(filtered));
-    return unique.length > 0 ? unique : [WebhookEventType.ALERT_TRIGGERED];
-  }
-
   private ensureHttpsUrl(value: string): string {
     const trimmed = value.trim();
     if (!trimmed.toLowerCase().startsWith('https://')) {
@@ -198,7 +167,6 @@ export class WebhooksService {
       url: entity.url,
       enabled: entity.enabled,
       verifyTls: entity.verifyTls,
-      subscribedEvents: [...entity.subscribedEvents],
       shared: entity.ownerId == null,
       clientCertificate: entity.clientCert ?? undefined,
       clientKey: entity.clientKey ?? undefined,
@@ -213,7 +181,6 @@ export class WebhooksService {
             lastName: entity.owner.lastName,
           }
         : null,
-      linkedRuleIds: entity.rules?.map((rule) => rule.ruleId) ?? [],
       recentDeliveries:
         entity.deliveries?.map((delivery) => ({
           id: delivery.id,

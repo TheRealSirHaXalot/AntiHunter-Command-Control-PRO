@@ -3,7 +3,7 @@ set -eu
 
 if [ "$(id -u)" = "0" ]; then
   node_uid=$(id -u node)
-  for dir in /app/data/tiles /app/apps/backend/.secrets; do
+  for dir in /app/data/matter /app/data/tiles /app/apps/backend/.secrets; do
     mkdir -p "$dir"
     if [ "$(stat -c %u "$dir")" != "$node_uid" ]; then
       chown -R node:node "$dir"

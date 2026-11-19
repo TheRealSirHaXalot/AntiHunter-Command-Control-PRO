@@ -48,6 +48,7 @@ export interface InventoryDevice {
   lastLat?: number | null;
   lastLon?: number | null;
   siteId?: string | null;
+  signatures?: Array<{ id: string; name: string; kind: string }>;
   classification?: DeviceClassification | null;
 }
 
@@ -150,7 +151,6 @@ export interface AlertRule {
   emailRecipients: string[];
   messageTemplate?: string | null;
   mapStyle?: AlertRuleMapStyle | null;
-  webhookIds: string[];
   createdAt: string;
   updatedAt: string;
   lastTriggeredAt?: string | null;
@@ -177,7 +177,6 @@ export interface AlertRulePayload {
   emailRecipients?: string[];
   messageTemplate?: string | null;
   mapStyle?: AlertRuleMapStyle | null;
-  webhookIds?: string[];
 }
 
 export interface AlertRuleEvent {
@@ -211,7 +210,6 @@ export interface Webhook {
   url: string;
   enabled: boolean;
   verifyTls: boolean;
-  subscribedEvents: string[];
   shared: boolean;
   clientCertificate?: string | null;
   clientKey?: string | null;
@@ -219,7 +217,6 @@ export interface Webhook {
   lastSuccessAt?: string | null;
   lastFailureAt?: string | null;
   owner?: AlertRuleOwnerSummary | null;
-  linkedRuleIds: string[];
   recentDeliveries: WebhookDelivery[];
 }
 
@@ -391,7 +388,6 @@ export interface AdsbAlertRule {
   mapColor?: string | null;
   mapLabel?: string | null;
   blink?: boolean;
-  webhookIds?: string[] | null;
   messageTemplate?: string | null;
   createdAt: string;
   updatedAt: string;

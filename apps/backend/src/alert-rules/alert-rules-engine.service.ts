@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AlertRuleMatchMode, Prisma, WebhookEventType } from '@prisma/client';
+import { AlertRuleMatchMode, Prisma } from '@prisma/client';
 import type { AlertRule } from '@prisma/client';
 
 import { MailService } from '../mail/mail.service';
@@ -7,17 +7,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { SerialTargetDetected } from '../serial/serial.types';
 import { extractOui, normalizeMac } from '../utils/mac';
 import { WebhookDispatcherService } from '../webhooks/webhook-dispatcher.service';
+import { WebhookEventType } from '../webhooks/webhook-event-type';
 import { CommandCenterGateway } from '../ws/command-center.gateway';
 
-type AlertRuleWithHooks = Prisma.AlertRuleGetPayload<{
-  include: {
-    webhooks: {
-      include: {
-        webhook: true;
-      };
-    };
-  };
-}>;
+type AlertRuleWithHooks = Prisma.AlertRuleGetPayload<Record<string, never>>;
 
 interface TargetDetectionContext {
   event: SerialTargetDetected;
@@ -172,7 +165,7 @@ export class AlertRulesEngineService {
       mapStyle: this.parseMapStyle(rule.mapStyle),
     });
 
-    await this.webhookDispatcher.dispatchAlert(rule.webhooks, {
+    await this.webhookDispatcher.dispatchAlert({
       eventType: WebhookEventType.ALERT_TRIGGERED,
       event: 'alert.triggered',
       ruleId: rule.id,
@@ -363,13 +356,6 @@ export class AlertRulesEngineService {
     }
     const rules = await this.prisma.alertRule.findMany({
       where: { isActive: true },
-      include: {
-        webhooks: {
-          include: {
-            webhook: true,
-          },
-        },
-      },
     });
     this.cachedRules = rules;
     this.cacheExpiresAt = now + this.cacheTtlMs;

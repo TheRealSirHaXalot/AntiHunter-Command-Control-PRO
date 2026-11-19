@@ -194,8 +194,10 @@ export async function bootstrap(): Promise<BootstrapResult> {
 
   await killPort(port);
 
-  await app.listen(port, () => {
-    logger.log(`Command Center backend listening on port ${port}`, 'Bootstrap');
+  const listenHost = process.env.LISTEN_HOST?.trim() || '127.0.0.1';
+
+  await app.listen(port, listenHost, () => {
+    logger.log(`Command Center backend listening on ${listenHost}:${port}`, 'Bootstrap');
   });
 
   let redirectServer: ReturnType<typeof createServer> | undefined;
@@ -246,7 +248,7 @@ export async function bootstrap(): Promise<BootstrapResult> {
       );
     });
 
-    redirectServer.listen(redirectPort, () => {
+    redirectServer.listen(redirectPort, listenHost, () => {
       logger.log(
         `HTTP redirect listener active on port ${redirectPort} -> https port ${port}`,
         'Bootstrap',
