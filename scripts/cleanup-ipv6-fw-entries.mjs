@@ -1,12 +1,19 @@
 #!/usr/bin/env node
-import { PrismaClient } from '../apps/backend/node_modules/@prisma/client/index.js';
+import { createRequire } from 'module';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const backendDir = path.join(__dirname, '..', 'apps', 'backend');
+const backendRequire = createRequire(path.join(backendDir, 'package.json'));
+backendRequire('dotenv').config({ path: path.join(backendDir, '.env'), quiet: true });
+const { PrismaClient } = backendRequire('@prisma/client');
+const { PrismaPg } = backendRequire('@prisma/adapter-pg');
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+});
 
 function isValidIPv6(ip) {
   if (ip.includes('.')) return true;

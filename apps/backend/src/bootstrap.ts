@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { exec } from 'child_process';
+import type { NextFunction, Request, Response } from 'express';
 import { existsSync, readFileSync } from 'fs';
 import helmet from 'helmet';
 import { createServer } from 'http';
@@ -12,6 +13,8 @@ import { join } from 'path';
 import { promisify } from 'util';
 
 import { AppModule } from './app.module';
+import { FirewallMiddleware } from './firewall/firewall.middleware';
+import { FirewallService } from './firewall/firewall.service';
 import { SanitizeInputPipe } from './utils/sanitize-input.pipe';
 
 const execAsync = promisify(exec);
@@ -132,6 +135,7 @@ export async function bootstrap(): Promise<BootstrapResult> {
 
   const trustProxy = process.env.TRUST_PROXY?.trim() || 'loopback';
   app.set('trust proxy', /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
+  app.set('query parser', 'extended');
 
   app.use(
     helmet({
@@ -158,6 +162,9 @@ export async function bootstrap(): Promise<BootstrapResult> {
         : false,
     }),
   );
+
+  const firewall = new FirewallMiddleware(app.get(FirewallService));
+  app.use((req: Request, res: Response, next: NextFunction) => firewall.use(req, res, next));
 
   const logger = app.get(Logger);
   app.useLogger(logger);

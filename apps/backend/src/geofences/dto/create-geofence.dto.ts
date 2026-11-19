@@ -3,6 +3,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsDefined,
   IsHexColor,
   IsOptional,
   IsString,
@@ -41,6 +42,7 @@ export class CreateGeofenceDto {
   @ArrayMinSize(3)
   polygon!: GeofenceVertexDto[];
 
+  @IsDefined()
   @ValidateNested()
   @Type(() => GeofenceAlarmConfigDto)
   alarm!: GeofenceAlarmConfigDto;
