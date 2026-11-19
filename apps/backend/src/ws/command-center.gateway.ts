@@ -8,6 +8,7 @@ import {
   ValidationPipe,
   forwardRef,
 } from '@nestjs/common';
+import { HttpAdapterHost } from '@nestjs/core';
 import {
   ConnectedSocket,
   MessageBody,
@@ -20,6 +21,7 @@ import {
   WsException,
 } from '@nestjs/websockets';
 import { Role } from '@prisma/client';
+import proxyaddr from 'proxy-addr';
 import { Subscription } from 'rxjs';
 import { Server, Socket } from 'socket.io';
 
@@ -28,6 +30,7 @@ import { CommandState, CommandsService } from '../commands/commands.service';
 import { SendCommandDto } from '../commands/dto/send-command.dto';
 import { DronesService } from '../drones/drones.service';
 import { EventBusService, CommandCenterEvent } from '../events/event-bus.service';
+import { FirewallBlockedException, FirewallService } from '../firewall/firewall.service';
 import { GeofenceEvent, GeofenceResponse, GeofencesService } from '../geofences/geofences.service';
 import { NodesService } from '../nodes/nodes.service';
 
@@ -65,6 +68,8 @@ export class CommandCenterGateway
     private readonly geofencesService: GeofencesService,
     @Inject(forwardRef(() => DronesService))
     private readonly dronesService: DronesService,
+    private readonly firewallService: FirewallService,
+    private readonly httpAdapterHost: HttpAdapterHost,
   ) {}
 
   afterInit(server: Server): void {
@@ -84,6 +89,23 @@ export class CommandCenterGateway
   }
 
   async handleConnection(@ConnectedSocket() client: Socket): Promise<void> {
+    try {
+      const trust = this.httpAdapterHost.httpAdapter.getInstance().get('trust proxy fn');
+      await this.firewallService.enforce({
+        ip: proxyaddr(client.request, trust),
+        path: client.nsp.name,
+        method: 'WS',
+        userAgent: client.handshake.headers['user-agent'],
+      });
+    } catch (error) {
+      if (error instanceof FirewallBlockedException) {
+        client.emit('error', 'forbidden');
+        client.disconnect(true);
+        return;
+      }
+      throw error;
+    }
+
     try {
       const token =
         (client.handshake.auth?.token as string | undefined) ||

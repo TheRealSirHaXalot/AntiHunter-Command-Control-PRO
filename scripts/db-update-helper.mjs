@@ -263,7 +263,7 @@ function handleDrift(statusOutput) {
   console.error(statusOutput);
   console.log('\nSuggested commands:');
   console.log('  pnpm --filter @command-center/backend exec -- prisma migrate diff \\');
-  console.log('    --from-schema-datasource --to-schema prisma/schema.prisma --script');
+  console.log('    --from-config-datasource --to-schema prisma/schema.prisma --script');
   console.log(
     '  pnpm --filter @command-center/backend exec -- prisma migrate resolve --applied <migration>',
   );
@@ -275,8 +275,13 @@ const MISMATCH_ACTIONS = ['repair', 'backup-repair', 'ignore', 'abort'];
 async function withPrisma(fn) {
   const previousCwd = process.cwd();
   process.chdir(backendDir);
-  const { PrismaClient } = createRequire(path.join(backendDir, 'package.json'))('@prisma/client');
-  const prisma = new PrismaClient();
+  const backendRequire = createRequire(path.join(backendDir, 'package.json'));
+  backendRequire('dotenv').config({ path: path.join(backendDir, '.env'), quiet: true });
+  const { PrismaClient } = backendRequire('@prisma/client');
+  const { PrismaPg } = backendRequire('@prisma/adapter-pg');
+  const prisma = new PrismaClient({
+    adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+  });
   try {
     return await fn(prisma);
   } finally {
@@ -299,9 +304,8 @@ async function schemaDiffSql() {
   const args = [
     'migrate',
     'diff',
-    '--from-schema-datasource',
-    prismaSchemaPath,
-    '--to-schema-datamodel',
+    '--from-config-datasource',
+    '--to-schema',
     prismaSchemaPath,
     '--script',
   ];
@@ -403,7 +407,7 @@ async function applyRepair(sql, unknown) {
   const file = path.join(tmpdir(), `ahcc-db-repair-${process.pid}.sql`);
   writeFileSync(file, sql, { mode: 0o600 });
   try {
-    await runPrisma(['db', 'execute', '--file', file, '--schema', prismaSchemaPath], {
+    await runPrisma(['db', 'execute', '--file', file], {
       capture: true,
     });
   } finally {
