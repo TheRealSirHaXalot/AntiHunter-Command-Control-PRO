@@ -1098,3 +1098,15 @@ model KnownMeshRadio {
   addedBy   String?
   createdAt DateTime @default(now())
 }
+
+model BaselineEvent {
+  id        String   @id @default(cuid())
+  nodeId    String
+  siteId    String?
+  kind      String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@index([kind, createdAt])
+  @@index([nodeId, kind])
+}

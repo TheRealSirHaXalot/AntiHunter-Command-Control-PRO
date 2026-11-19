@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { AlertRulesModule } from '../alert-rules/alert-rules.module';
+import { BaselineEventsModule } from '../baseline-events/baseline-events.module';
 import { CampaignsModule } from '../campaigns/campaigns.module';
 import { CommandsModule } from '../commands/commands.module';
 import { DronesModule } from '../drones/drones.module';
@@ -33,6 +34,7 @@ import { WsModule } from '../ws/ws.module';
     ProbeInventoryModule,
     CampaignsModule,
     KnownRadiosModule,
+    BaselineEventsModule,
   ],
   providers: [SerialIngestService, TargetTrackingService],
 })
