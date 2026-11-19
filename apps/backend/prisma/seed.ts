@@ -1,8 +1,12 @@
+import 'dotenv/config';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Role, SiteAccessLevel } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { DEFAULT_FEATURES_BY_ROLE } from '../src/users/user-permissions.constants';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+});
 
 async function main() {
   const adminPassword = process.env.ADMIN_PASSWORD ?? 'admin';

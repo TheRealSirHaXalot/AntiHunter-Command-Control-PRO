@@ -42,6 +42,7 @@ services:
       SERIAL_BAUD: '115200'
       ALLOW_FOREVER: 'true'
       ALLOW_ERASE_FORCE: 'false'
+      TRUST_PROXY: '1'
       AHCC_TILE_CACHE: /app/data/tiles
       AHCC_TILE_CACHE_MAX_MB: ${AHCC_TILE_CACHE_MAX_MB:-2048}
       AHCC_DB_MISMATCH: ${AHCC_DB_MISMATCH:-abort}
