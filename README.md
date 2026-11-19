@@ -607,12 +607,12 @@ This brings up three containers:
 
 All three ports (8080, 3000, 5432) are bound to `127.0.0.1` on the host. To reach AHCC from another device, follow [Remote Connections](docs/INTERNET-CONNECTIVITY.md).
 
-Log in at `http://localhost:8080` with the seeded admin. Without `ADMIN_PASSWORD`, the seed generates a random password on first run and prints it once: `docker compose logs backend | grep "Admin account created"`.
+Log in at `http://localhost:8080` with the seeded admin. Without `ADMIN_PASSWORD`, the seed generates a random password on first run and saves it to a file only the backend user can read: `docker compose exec backend cat apps/backend/.secrets/initial-admin-password`.
 
 | Variable         | Default                         |
 | ---------------- | ------------------------------- |
 | `ADMIN_EMAIL`    | `admin@example.com`             |
-| `ADMIN_PASSWORD` | random, printed on first run    |
+| `ADMIN_PASSWORD` | random, saved on first run      |
 
 To change the admin login, database URL, mail server, or serial port, edit the `environment` block of the `backend` service in `docker-compose.yml` before the first run — `docker/.env.example` lists every variable. Compose uses those literal values; it does not read a separate `.env` file.
 

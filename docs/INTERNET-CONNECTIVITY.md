@@ -35,7 +35,7 @@ Never forward ports 3000, 5173, 8080 or 5432 on your router, and never run `tail
 0. First: passwords and 2FA
 --------------------------------------------------------------------------------
 
-Your first admin password was printed once at install: by the setup script, or for Docker by `docker compose logs backend | grep "Admin account created"`.
+Your first admin password was printed once at install by the setup script. For Docker, read it with `docker compose exec backend cat apps/backend/.secrets/initial-admin-password`.
 
 Only the web UI needs a VPN. Use WireGuard or Netbird. Don't open ports 3000 or 5173 to the internet. The backend listens on all interfaces on port 3000, so block it with the host firewall.
 
