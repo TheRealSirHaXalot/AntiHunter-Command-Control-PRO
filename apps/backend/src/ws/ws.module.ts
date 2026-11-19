@@ -4,6 +4,7 @@ import { CommandCenterGateway } from './command-center.gateway';
 import { AuthModule } from '../auth/auth.module';
 import { CommandsModule } from '../commands/commands.module';
 import { DronesModule } from '../drones/drones.module';
+import { FirewallModule } from '../firewall/firewall.module';
 import { GeofencesModule } from '../geofences/geofences.module';
 import { NodesModule } from '../nodes/nodes.module';
 
@@ -13,6 +14,7 @@ import { NodesModule } from '../nodes/nodes.module';
     CommandsModule,
     AuthModule,
     GeofencesModule,
+    FirewallModule,
     forwardRef(() => DronesModule),
   ],
   providers: [CommandCenterGateway],

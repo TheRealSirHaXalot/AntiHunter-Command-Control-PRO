@@ -46,7 +46,21 @@ export class FirewallService {
   }
 
   async handleRequest(req: Request): Promise<void> {
-    const ip = this.getClientIp(req);
+    await this.enforce({
+      ip: this.getClientIp(req),
+      path: req.path,
+      method: req.method,
+      userAgent: req.headers['user-agent'],
+    });
+  }
+
+  async enforce(context: {
+    ip: string | null | undefined;
+    path: string;
+    method: string;
+    userAgent?: string;
+  }): Promise<void> {
+    const { ip, path, method, userAgent } = context;
     if (!ip) {
       return;
     }
@@ -70,9 +84,9 @@ export class FirewallService {
       await this.logBlock({
         ip: normalizedIp,
         reason: 'IP not in allow list',
-        path: req.path,
-        method: req.method,
-        userAgent: req.headers['user-agent'] as string | undefined,
+        path,
+        method,
+        userAgent,
       });
       throw new FirewallBlockedException('Access denied by firewall (allow list)');
     }
@@ -81,9 +95,9 @@ export class FirewallService {
       await this.logBlock({
         ip: normalizedIp,
         reason: 'IP blocked by list',
-        path: req.path,
-        method: req.method,
-        userAgent: req.headers['user-agent'] as string | undefined,
+        path,
+        method,
+        userAgent,
       });
       throw new FirewallBlockedException('Access denied by firewall (IP block list)');
     }
@@ -100,10 +114,10 @@ export class FirewallService {
       await this.logBlock({
         ip: normalizedIp,
         reason: rule.reason ?? 'IP blocked by rule',
-        path: req.path,
-        method: req.method,
+        path,
+        method,
         ruleId: rule.id,
-        userAgent: req.headers['user-agent'] as string | undefined,
+        userAgent,
       });
       throw new FirewallBlockedException('Access denied by firewall (rule)');
     }
@@ -113,11 +127,11 @@ export class FirewallService {
       await this.logBlock({
         ip: normalizedIp,
         reason: 'Blocked by geo policy',
-        path: req.path,
-        method: req.method,
+        path,
+        method,
         country,
         outcome: FirewallLogOutcome.GEO_BLOCK,
-        userAgent: req.headers['user-agent'] as string | undefined,
+        userAgent,
       });
       throw new FirewallBlockedException('Access denied by firewall (geo policy)');
     }
@@ -126,11 +140,11 @@ export class FirewallService {
       await this.logBlock({
         ip: normalizedIp,
         reason: 'Default deny policy',
-        path: req.path,
-        method: req.method,
+        path,
+        method,
         country,
         outcome: FirewallLogOutcome.DEFAULT_DENY,
-        userAgent: req.headers['user-agent'] as string | undefined,
+        userAgent,
       });
       throw new FirewallBlockedException('Access denied by firewall (default policy)');
     }
@@ -451,22 +465,13 @@ export class FirewallService {
     if (!req) {
       return null;
     }
-    const forwarded = req.headers['x-forwarded-for'];
-    let candidate: string | undefined;
-    if (Array.isArray(forwarded)) {
-      candidate = forwarded[0];
-    } else if (typeof forwarded === 'string' && forwarded.length > 0) {
-      candidate = forwarded.split(',')[0];
-    }
-    if (!candidate) {
-      candidate =
-        req.ip ||
-        (req.connection && 'remoteAddress' in req.connection
-          ? req.connection.remoteAddress
-          : undefined) ||
-        (req.socket && 'remoteAddress' in req.socket ? req.socket.remoteAddress : undefined) ||
-        undefined;
-    }
+    const candidate =
+      req.ip ||
+      (req.connection && 'remoteAddress' in req.connection
+        ? req.connection.remoteAddress
+        : undefined) ||
+      (req.socket && 'remoteAddress' in req.socket ? req.socket.remoteAddress : undefined) ||
+      undefined;
     return this.normalizeIp(candidate ?? null);
   }
 

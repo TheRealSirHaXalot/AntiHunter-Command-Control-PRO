@@ -7,6 +7,8 @@ export type IdentitySource = 'auto-generated' | 'imported' | 'rotated';
 export type DriftStatus = 'unknown' | 'in-policy' | 'drift' | 'unreachable';
 export type VerifyMethod = 'local-usb' | 'remote-pkc';
 
+const toBytes = (buf: Buffer): Uint8Array<ArrayBuffer> => new Uint8Array(buf);
+
 export interface IdentityRow {
   id: string;
   label: string;
@@ -113,7 +115,9 @@ export class FleetStore {
     role: IdentityRole;
     source: IdentitySource;
   }): Promise<IdentityRow> {
-    const created = await this.prisma.fleetIdentity.create({ data: row });
+    const created = await this.prisma.fleetIdentity.create({
+      data: { ...row, publicKey: toBytes(row.publicKey) },
+    });
     return this.mapIdentity(created);
   }
 
@@ -349,7 +353,7 @@ export class FleetStore {
         startedBy: row.startedBy,
         targets: row.targets as unknown as object,
         newPskFp: row.newPskFp,
-        newPsk,
+        newPsk: toBytes(newPsk),
         notes: row.notes,
       },
     });
@@ -504,7 +508,7 @@ export class FleetStore {
   }): Promise<void> {
     const data = {
       fp: row.fp,
-      rawPsk: row.rawPsk,
+      rawPsk: toBytes(row.rawPsk),
       pskHash: row.pskHash,
       rotationId: row.rotationId,
     };

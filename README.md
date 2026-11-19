@@ -376,6 +376,7 @@ Keep certificates, mail credentials, and site identifiers in environment variabl
 | `HTTPS_KEY_PATH` / `HTTPS_CERT_PATH` / `HTTPS_CA_PATH` / `HTTPS_PASSPHRASE`    | _(unset)_ | PEM bundle + optional passphrase for in-process TLS.                  |
 | `HTTP_PREFIX`                                                                  | `api`     | Namespace for REST routes (useful when reverse proxying).             |
 | `HTTP_REDIRECT_PORT`                                                           | _(unset)_ | Enables HTTP->HTTPS redirects when running dual listeners.            |
+| `TRUST_PROXY`                                                                  | `loopback` | Express `trust proxy`: which hops may set `X-Forwarded-For`. Addresses/CIDRs, or a hop count (Docker uses `1` for nginx). |
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`, `MAIL_PASS`, `MAIL_FROM` | _(unset)_ | SMTP settings for invite/reset emails. Require STARTTLS/SMTPS.        |
 | `SITE_ID`                                                                      | `default` | Tag firewall logs, MQTT topics, and exports per site for auditing.    |
 
