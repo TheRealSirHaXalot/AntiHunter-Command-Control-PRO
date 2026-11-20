@@ -9,6 +9,7 @@ import { AlarmsModule } from './alarms/alarms.module';
 import { AlertRulesModule } from './alert-rules/alert-rules.module';
 import { AppConfigModule } from './app-config/app-config.module';
 import { AuthModule } from './auth/auth.module';
+import { BaselineEventsModule } from './baseline-events/baseline-events.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { ChatModule } from './chat/chat.module';
 import { CommandsModule } from './commands/commands.module';
@@ -117,6 +118,7 @@ import { WsModule } from './ws/ws.module';
     ProbeInventoryModule,
     DeviceClassificationModule,
     CampaignsModule,
+    BaselineEventsModule,
   ],
 })
 export class AppModule {}

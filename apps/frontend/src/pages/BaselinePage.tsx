@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { MdFingerprint } from 'react-icons/md';
 
+import type { BaselineEventRecord } from '../api/baseline-events';
 import { apiClient } from '../api/client';
 import {
   BaselineConfig,
@@ -11,8 +12,10 @@ import {
   PresenceDevice,
 } from '../api/device-classification';
 import type { CommandRequest, CommandResponse, SiteSummary } from '../api/types';
+import { extractBaselineEvent } from '../components/socket-bridge';
 import { useAuthStore } from '../stores/auth-store';
 import { useBaselineStore } from '../stores/baseline-store';
+import type { BaselineSnapshot } from '../stores/baseline-store';
 import { useNodeStore } from '../stores/node-store';
 
 const CATEGORY_META: Record<DeviceCategory, { label: string; color: string; blurb: string }> = {
@@ -93,7 +96,8 @@ export function BaselinePage() {
   const bStatus = useBaselineStore((state) => state.status);
   const bAnomalies = useBaselineStore((state) => state.anomalies);
   const bDone = useBaselineStore((state) => state.done);
-  const clearBaselineFeed = useBaselineStore((state) => state.clear);
+  const clearBaselineStore = useBaselineStore((state) => state.clear);
+  const loadBaselineFeed = useBaselineStore((state) => state.load);
   const [target, setTarget] = useState('@ALL');
   const [fwSiteId, setFwSiteId] = useState<string | undefined>(undefined);
   const [duration, setDuration] = useState(300);
@@ -134,6 +138,40 @@ export function BaselinePage() {
 
   const startBaseline = () =>
     send('BASELINE_START', forever ? [String(duration), 'FOREVER'] : [String(duration)]);
+
+  const { data: storedEvents } = useQuery<BaselineEventRecord[]>({
+    queryKey: ['baseline-events'],
+    queryFn: () => apiClient.get<BaselineEventRecord[]>('/baseline/events'),
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    if (!storedEvents) return;
+    const snapshot: BaselineSnapshot = { status: [], anomalies: [], done: [] };
+    for (const record of storedEvents) {
+      const result = extractBaselineEvent(record.payload, record.id);
+      if (result?.mode === 'status') snapshot.status.push(result.status);
+      else if (result?.mode === 'anomaly') snapshot.anomalies.push(result.anomaly);
+      else if (result?.mode === 'done') snapshot.done.push(result.done);
+    }
+    loadBaselineFeed(snapshot);
+  }, [storedEvents, loadBaselineFeed]);
+
+  const clearStoredFeed = useMutation({
+    mutationFn: () => apiClient.delete('/baseline/events'),
+    onSuccess: () => {
+      clearBaselineStore();
+      void queryClient.invalidateQueries({ queryKey: ['baseline-events'] });
+    },
+  });
+
+  const clearBaselineFeed = () => {
+    if (canSend) {
+      clearStoredFeed.mutate();
+    } else {
+      clearBaselineStore();
+    }
+  };
 
   const statusRows = useMemo(() => Object.values(bStatus), [bStatus]);
 
@@ -342,16 +380,29 @@ export function BaselinePage() {
           >
             Stop
           </button>
+          <button
+            type="button"
+            className="control-chip control-chip--danger"
+            disabled={!canSend || command.isPending}
+            onClick={() => send('BASELINE_RESET')}
+          >
+            Reset baseline
+          </button>
           {(statusRows.length > 0 || bAnomalies.length > 0) && (
             <button
               type="button"
               className="control-chip control-chip--ghost"
+              disabled={clearStoredFeed.isPending}
               onClick={clearBaselineFeed}
             >
               Clear feed
             </button>
           )}
         </div>
+        <p className="form-hint">
+          Nodes keep their baseline between runs and report only new, returned or moved devices.
+          Reset baseline to learn from scratch.
+        </p>
         {fwFeedback && (
           <p
             className="form-hint"

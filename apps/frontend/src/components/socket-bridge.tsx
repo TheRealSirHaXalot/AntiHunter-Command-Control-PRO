@@ -1493,12 +1493,12 @@ function extractSentinelEvent(payload: unknown): SentinelEventResult | null {
   };
 }
 
-type BaselineEventResult =
+export type BaselineEventResult =
   | { mode: 'status'; status: BaselineNodeStatus }
   | { mode: 'anomaly'; anomaly: BaselineAnomalyEntry }
   | { mode: 'done'; done: BaselineDoneSummary };
 
-function extractBaselineEvent(payload: unknown): BaselineEventResult | null {
+export function extractBaselineEvent(payload: unknown, id?: string): BaselineEventResult | null {
   if (!payload || typeof payload !== 'object') {
     return null;
   }
@@ -1519,9 +1519,10 @@ function extractBaselineEvent(payload: unknown): BaselineEventResult | null {
   const str = (value: unknown): string | undefined =>
     typeof value === 'string' ? value : undefined;
   const makeId = () =>
-    typeof window !== 'undefined' && window.crypto?.randomUUID
+    id ??
+    (typeof window !== 'undefined' && window.crypto?.randomUUID
       ? window.crypto.randomUUID()
-      : `${nodeId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      : `${nodeId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
 
   if (category === 'baseline-done') {
     return {

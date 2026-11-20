@@ -11,6 +11,7 @@ import {
   SerialTargetDetected,
 } from './serial.types';
 import { AlertRulesEngineService } from '../alert-rules/alert-rules-engine.service';
+import { BaselineEventsService } from '../baseline-events/baseline-events.service';
 import { CampaignsService } from '../campaigns/campaigns.service';
 import { CommandsService } from '../commands/commands.service';
 import { DronesService } from '../drones/drones.service';
@@ -113,6 +114,7 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
     private readonly probeInventoryService: ProbeInventoryService,
     private readonly campaignsService: CampaignsService,
     private readonly knownRadios: KnownRadiosService,
+    private readonly baselineEvents: BaselineEventsService,
     configService: ConfigService,
   ) {
     const concurrency = Math.max(1, configService.get<number>('serial.ingestConcurrency', 1));
@@ -359,8 +361,8 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
           const temperatureProvided = temperatureC !== undefined || temperatureF !== undefined;
           const temperatureUpdatedAt = temperatureProvided ? timestamp : undefined;
           const sanitizedMessage = this.sanitizeMessage(event.message);
-          this.gateway.emitEvent({
-            type: 'event.alert',
+          const alertPayload = {
+            type: 'event.alert' as const,
             timestamp: timestamp.toISOString(),
             level: event.level,
             category: event.category,
@@ -371,7 +373,9 @@ export class SerialIngestService implements OnModuleInit, OnModuleDestroy {
             data: event.data,
             raw: event.raw,
             siteId,
-          });
+          };
+          this.gateway.emitEvent(alertPayload);
+          void this.baselineEvents.record(alertPayload);
           const allowNodePositionUpdate = (() => {
             if (!event.category) return false;
             const normalized = event.category.toLowerCase();
