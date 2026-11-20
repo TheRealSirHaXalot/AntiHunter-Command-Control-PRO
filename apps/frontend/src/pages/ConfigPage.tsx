@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
-import { WebhooksSection } from './WebhooksSection';
+import { RemoteAlertsSection } from './RemoteAlertsSection';
 import { apiClient } from '../api/client';
 import type {
   AlarmConfig,
@@ -281,7 +282,8 @@ type ConfigSectionId =
   | 'map'
   | 'oui'
   | 'firewall'
-  | 'webhooks'
+  | 'remote'
+  | 'remote-access'
   | 'faa'
   | 'system-updates';
 
@@ -301,7 +303,11 @@ const CONFIG_SECTIONS: Array<{ id: ConfigSectionId; label: string; description: 
   { id: 'mqtt', label: 'MQTT Federation', description: 'Remote site replication' },
   { id: 'chat', label: 'Chat', description: 'Encrypted operator chat keys' },
   { id: 'detection', label: 'Detection Defaults', description: 'Scan and alert presets' },
-  { id: 'webhooks', label: 'Webhooks', description: 'External alert destinations' },
+  {
+    id: 'remote-access',
+    label: 'Remote Access',
+    description: 'Tailscale tailnet access',
+  },
   { id: 'map', label: 'Map & Coverage', description: 'Map viewport and coverage rings' },
   { id: 'oui', label: 'OUI Resolver', description: 'Vendor cache imports & exports' },
   { id: 'faa', label: 'FAA Registry', description: 'Aircraft registry enrichment' },
@@ -361,7 +367,13 @@ export function ConfigPage() {
   });
   const chatAddonEnabled =
     useAuthStore((state) => state.user?.preferences?.notifications?.addons?.chat ?? false) ?? false;
-  const [activeSection, setActiveSection] = useState<ConfigSectionId>('alarms');
+  const [searchParams] = useSearchParams();
+  const requestedSection = searchParams.get('section');
+  const [activeSection, setActiveSection] = useState<ConfigSectionId>(
+    requestedSection && CONFIG_SECTIONS.some((s) => s.id === requestedSection)
+      ? (requestedSection as ConfigSectionId)
+      : 'alarms',
+  );
   const visibleSections = useMemo(
     () => (chatAddonEnabled ? CONFIG_SECTIONS : CONFIG_SECTIONS.filter((s) => s.id !== 'chat')),
     [chatAddonEnabled],
@@ -4342,12 +4354,11 @@ export function ConfigPage() {
             </div>
           </section>
 
-          <section className={cardClass('webhooks')}>
+          <section className={cardClass('remote-access')}>
             <header>
-              <h2>Webhooks</h2>
-              <p>Manage outbound alert endpoints and review recent deliveries.</p>
+              <h2>Remote Access</h2>
             </header>
-            <WebhooksSection />
+            <RemoteAlertsSection view="access" />
           </section>
 
           <section className={cardClass('map')}>

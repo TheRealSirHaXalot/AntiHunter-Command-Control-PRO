@@ -1,13 +1,4 @@
-﻿import { WebhookEventType } from '@prisma/client';
-import {
-  IsArray,
-  IsBoolean,
-  IsEnum,
-  IsOptional,
-  IsString,
-  IsUrl,
-  MaxLength,
-} from 'class-validator';
+﻿import { IsBoolean, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
 
 export class CreateWebhookDto {
   @IsString()
@@ -23,11 +14,6 @@ export class CreateWebhookDto {
   @IsString()
   @MaxLength(256)
   secret?: string;
-
-  @IsOptional()
-  @IsArray()
-  @IsEnum(WebhookEventType, { each: true })
-  subscribedEvents?: WebhookEventType[];
 
   @IsOptional()
   @IsBoolean()

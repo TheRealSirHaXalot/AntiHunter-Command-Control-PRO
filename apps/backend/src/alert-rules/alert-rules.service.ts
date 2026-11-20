@@ -26,9 +26,6 @@ export class AlertRulesService {
     owner: {
       select: { id: true, email: true, firstName: true, lastName: true },
     },
-    webhooks: {
-      select: { webhookId: true },
-    },
   } as const;
 
   constructor(private readonly prisma: PrismaService) {}
@@ -109,8 +106,7 @@ export class AlertRulesService {
       emailRecipients,
       mapStyle,
       messageTemplate,
-      webhookIds,
-    } = await this.sanitizeRuleCollections(dto, null, userId, role);
+    } = await this.sanitizeRuleCollections(dto, null);
 
     const ownerId = scope === AlertRuleScope.PERSONAL ? userId : null;
 
@@ -136,13 +132,6 @@ export class AlertRulesService {
         emailRecipients,
         messageTemplate,
         mapStyle: mapStyle ? (mapStyle as Prisma.InputJsonValue) : Prisma.JsonNull,
-        webhooks: webhookIds.length
-          ? {
-              create: webhookIds.map((webhookId) => ({
-                webhook: { connect: { id: webhookId } },
-              })),
-            }
-          : undefined,
       },
       include: AlertRulesService.ruleInclude,
     });
@@ -186,9 +175,7 @@ export class AlertRulesService {
       emailRecipients,
       mapStyle,
       messageTemplate,
-      webhookIds,
-      webhooksSpecified,
-    } = await this.sanitizeRuleCollections(dto, existing, userId, role);
+    } = await this.sanitizeRuleCollections(dto, existing);
 
     const updated = await this.prisma.alertRule.update({
       where: { id },
@@ -221,14 +208,6 @@ export class AlertRulesService {
               ? (mapStyle as Prisma.InputJsonValue)
               : Prisma.JsonNull
             : (existing.mapStyle ?? Prisma.JsonNull),
-        webhooks: webhooksSpecified
-          ? {
-              deleteMany: {},
-              create: webhookIds.map((webhookId) => ({
-                webhook: { connect: { id: webhookId } },
-              })),
-            }
-          : undefined,
       },
       include: AlertRulesService.ruleInclude,
     });
@@ -367,8 +346,6 @@ export class AlertRulesService {
   private async sanitizeRuleCollections(
     dto: CreateAlertRuleDto | UpdateAlertRuleDto,
     existing: AlertRuleEntity | null,
-    userId: string,
-    role: Role,
   ) {
     const nextOui =
       dto.ouiPrefixes !== undefined
@@ -426,11 +403,6 @@ export class AlertRulesService {
         ? this.cleanMessage(dto.messageTemplate)
         : (existing?.messageTemplate ?? null);
 
-    const webhooksSpecified = dto.webhookIds !== undefined;
-    const webhookIds = webhooksSpecified
-      ? await this.normalizeWebhookIds(dto.webhookIds ?? [], userId, role)
-      : (existing?.webhooks?.map((entry) => entry.webhookId) ?? []);
-
     return {
       ouiPrefixes: nextOui,
       ssids: nextSsids,
@@ -445,47 +417,7 @@ export class AlertRulesService {
       emailRecipients: nextEmails,
       mapStyle,
       messageTemplate,
-      webhookIds,
-      webhooksSpecified,
     };
-  }
-
-  private async normalizeWebhookIds(
-    values: string[],
-    userId: string,
-    role: Role,
-  ): Promise<string[]> {
-    if (!values?.length) {
-      return [];
-    }
-    const normalized = Array.from(
-      new Set(
-        values
-          .map((value) => value?.trim())
-          .filter((value): value is string => Boolean(value && value.length)),
-      ),
-    );
-    if (normalized.length === 0) {
-      return [];
-    }
-
-    const where: Prisma.WebhookWhereInput = {
-      id: { in: normalized },
-    };
-    if (role !== Role.ADMIN) {
-      where.OR = [{ ownerId: userId }, { ownerId: null }];
-    }
-
-    const found = await this.prisma.webhook.findMany({
-      where,
-      select: { id: true },
-    });
-    const foundSet = new Set(found.map((entry) => entry.id));
-    const missing = normalized.filter((id) => !foundSet.has(id));
-    if (missing.length > 0) {
-      throw new BadRequestException(`Webhooks not found or inaccessible: ${missing.join(', ')}`);
-    }
-    return normalized;
   }
 
   private normalizeOuiList(values?: string[]): string[] {
@@ -723,7 +655,6 @@ export class AlertRulesService {
       emailRecipients: [...rule.emailRecipients],
       messageTemplate: rule.messageTemplate,
       mapStyle: this.parseMapStyle(rule.mapStyle),
-      webhookIds: rule.webhooks?.map((entry) => entry.webhookId) ?? [],
       createdAt: rule.createdAt,
       updatedAt: rule.updatedAt,
       lastTriggeredAt: rule.lastTriggeredAt,

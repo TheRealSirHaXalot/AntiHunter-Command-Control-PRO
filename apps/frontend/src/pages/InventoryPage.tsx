@@ -322,6 +322,7 @@ export function InventoryPage() {
                     Type {renderSortIcon('type')}
                   </button>
                 </th>
+                <th>Signatures</th>
                 <th aria-sort={ariaSort('channel')}>
                   <button
                     type="button"
@@ -401,6 +402,15 @@ export function InventoryPage() {
                     </td>
                     <td data-label="Vendor">{device.vendor ?? 'Unknown'}</td>
                     <td data-label="Type">{device.type ?? 'N/A'}</td>
+                    <td data-label="Signatures">
+                      {device.signatures?.length
+                        ? device.signatures
+                            .map(
+                              (sig) => `${sig.name} (${sig.kind.replace(/_/g, ' ').toLowerCase()})`,
+                            )
+                            .join(', ')
+                        : '—'}
+                    </td>
                     <td data-label="Channel">{device.channel != null ? device.channel : 'N/A'}</td>
                     <td data-label="SSID / Name">{device.ssid ?? 'N/A'}</td>
                     <td data-label="Hits">{device.hits}</td>

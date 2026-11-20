@@ -36,7 +36,6 @@ export interface AlertRuleDto {
   emailRecipients: string[];
   messageTemplate?: string | null;
   mapStyle?: AlertRuleMapStyle | null;
-  webhookIds: string[];
   createdAt: Date;
   updatedAt: Date;
   lastTriggeredAt?: Date | null;

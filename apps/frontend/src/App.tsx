@@ -34,6 +34,7 @@ import { InventoryPage } from './pages/InventoryPage';
 import { MapPage } from './pages/MapPage';
 import { NodesPage } from './pages/NodesPage';
 import { ProbeInventoryPage } from './pages/ProbeInventoryPage';
+import { RemoteAlertsPage } from './pages/RemoteAlertsPage';
 import { SchedulerPage } from './pages/SchedulerPage';
 import { SentinelPage } from './pages/SentinelPage';
 import { StrategyAdvisorPage } from './pages/StrategyAdvisorPage';
@@ -150,6 +151,7 @@ export default function App() {
                 <Route path="/alerts/custom" element={<AlertsPage />} />
                 <Route path="/alerts/adsb" element={<AdsbAlertsPage />} />
                 <Route path="/alerts/events" element={<AlertsEventLogPage />} />
+                <Route path="/alerts/remote" element={<RemoteAlertsPage />} />
                 <Route path="/console" element={<CommandConsolePage />} />
                 {chatEnabled ? <Route path="/chat" element={<ChatPage />} /> : null}
                 {sentinelEnabled ? <Route path="/sentinel" element={<SentinelPage />} /> : null}

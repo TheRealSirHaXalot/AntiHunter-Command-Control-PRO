@@ -299,7 +299,11 @@ prompt_configuration() {
         read -p "Backup retention days [7]: " retention
         BACKUP_RETENTION_DAYS=${retention:-7}
     fi
-    
+
+    echo ""
+    read -p "Install Signal alerts (signal-cli as isolated ahcc-signal service, encrypted state)? [no]: " signal_choice
+    ENABLE_SIGNAL=${signal_choice:-no}
+
     # Summary
     echo ""
     echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
@@ -328,6 +332,7 @@ prompt_configuration() {
     echo "fail2ban:            $ENABLE_FAIL2BAN"
     echo "Backups:             $ENABLE_BACKUPS"
     [[ "$ENABLE_BACKUPS" =~ ^[Yy][Ee][Ss]$ ]] && echo "Retention:           $BACKUP_RETENTION_DAYS days"
+    echo "Signal alerts:       $ENABLE_SIGNAL"
     echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
     echo ""
     
@@ -1043,9 +1048,51 @@ setup_local_domain() {
 # SystemD Service Configuration
 #############################################################################
 
+seal_remote_alerts_key() {
+    step "Sealing the remote alerts key with systemd-creds..."
+    REMOTE_ALERTS_CRED_LINE=""
+    if ! command -v systemd-creds >/dev/null 2>&1 || ! systemd-creds --help 2>/dev/null | grep -q -- '--with-key'; then
+        warn "systemd-creds not available; the remote alerts key stays in $BACKEND_DIR/.secrets (0600)"
+        return
+    fi
+    local sealed="/etc/credstore.encrypted/ahcc-remote-alerts-key"
+    local legacy="$BACKEND_DIR/.secrets/remote-alerts.key"
+    sudo install -d -o root -g root -m 0700 /etc/credstore.encrypted
+    if ! sudo test -s "$sealed"; then
+        if sudo test -s "$legacy"; then
+            sudo cat "$legacy" | sudo systemd-creds encrypt --with-key=auto --name=remote-alerts-key - "$sealed" \
+                || error_exit "Failed to seal the remote alerts key"
+            if [[ "$(sudo systemd-creds decrypt --name=remote-alerts-key "$sealed" -)" == "$(sudo cat "$legacy")" ]]; then
+                sudo rm -f "$legacy"
+            else
+                error_exit "Sealed remote alerts key does not match $legacy; left both in place"
+            fi
+        else
+            head -c 32 /dev/urandom | base64 | tr -d '\n' | sudo systemd-creds encrypt --with-key=auto --name=remote-alerts-key - "$sealed" \
+                || error_exit "Failed to create the remote alerts key"
+        fi
+    fi
+    REMOTE_ALERTS_CRED_LINE="LoadCredentialEncrypted=remote-alerts-key:$sealed"
+    success "Remote alerts key sealed ($(systemd-creds has-tpm2 >/dev/null 2>&1 && echo TPM2 || echo host key))"
+}
+
+setup_signal_host() {
+    if [[ ! "$ENABLE_SIGNAL" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+        return
+    fi
+    step "Installing the isolated Signal connector..."
+    sudo bash "$REPO_DIR/scripts/signal/install-signal-host.sh" --backend-user "$INSTALL_USER" \
+        || error_exit "Signal connector install failed"
+    if ! sudo grep -q '^AHCC_SIGNAL_GATE=' "$BACKEND_DIR/.env"; then
+        echo "AHCC_SIGNAL_GATE=/run/ahcc-signal-gate.sock" | sudo tee -a "$BACKEND_DIR/.env" >/dev/null
+    fi
+    success "Signal connector installed; link it from Config > Remote alerts"
+}
+
 create_systemd_service() {
     step "Creating systemd service for backend..."
-    
+    seal_remote_alerts_key
+
     local service_file="/etc/systemd/system/${BACKEND_SERVICE}.service"
     local node_path
     node_path="$(command -v node)" || error_exit "Node executable not found"
@@ -1073,6 +1120,7 @@ User=$INSTALL_USER
 Group=$INSTALL_USER
 WorkingDirectory=$BACKEND_DIR
 EnvironmentFile=$BACKEND_DIR/.env
+$REMOTE_ALERTS_CRED_LINE
 ExecStart=$node_path dist/main.js
 Restart=on-failure
 RestartSec=5
@@ -1849,6 +1897,7 @@ EOF
     obtain_letsencrypt_certificate
     
     # Configure services
+    setup_signal_host
     create_systemd_service
     start_backend_service
     configure_nginx

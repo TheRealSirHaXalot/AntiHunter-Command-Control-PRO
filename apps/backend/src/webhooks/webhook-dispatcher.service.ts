@@ -1,10 +1,13 @@
 ﻿import { Injectable, Logger } from '@nestjs/common';
-import { AlarmLevel, InventoryDevice, Prisma, Webhook, WebhookEventType } from '@prisma/client';
+import { AlarmLevel, InventoryDevice, Prisma, Webhook } from '@prisma/client';
 import { createHmac } from 'node:crypto';
 import type { ConnectionOptions as TlsConnectionOptions } from 'node:tls';
 import { Agent, request } from 'undici';
 
+import { WebhookEventType } from './webhook-event-type';
 import { PrismaService } from '../prisma/prisma.service';
+import { AlertChannelsService } from '../push/alert-channels.service';
+import { nodeAlertSource } from '../push/alert-sources';
 import {
   SerialAlertEvent,
   SerialCommandAck,
@@ -15,15 +18,12 @@ import {
   SerialTargetDetected,
 } from '../serial/serial.types';
 
-type RuleWebhookLink = Prisma.AlertRuleWebhookGetPayload<{
-  include: { webhook: true };
-}>;
-
 interface WebhookDispatchContext {
   event: string;
   eventType: WebhookEventType;
   timestamp: Date;
   ruleId?: string;
+  source?: string;
   ruleName?: string;
   severity?: AlarmLevel;
   message?: string;
@@ -40,33 +40,146 @@ interface WebhookDispatchContext {
   payload?: Record<string, unknown>;
 }
 
+const NUM = '-?\\d+(?:\\.\\d+)?';
+const COORD_TEXT: Array<[RegExp, string]> = [
+  [new RegExp(`\\s*\\b(?:GPS|Location|OP)[:=]\\s*${NUM},\\s*${NUM}`, 'gi'), ''],
+  [new RegExp(`(RID_RX:[^:\\s]+:-?\\d+):${NUM}:${NUM}`, 'gi'), '$1'],
+  [new RegExp(`(RID_CLAIM:[^:\\s]+):${NUM}:${NUM}`, 'gi'), '$1'],
+];
+const COORD_KEY = /^(lat|lon|latitude|longitude)$|(Lat|Lon|Latitude|Longitude)$/;
+
+export function stripCoords(text: string): string {
+  return COORD_TEXT.reduce((out, [pattern, replacement]) => out.replace(pattern, replacement), text)
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+export function scrubCoords(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return stripCoords(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(scrubCoords);
+  }
+  if (value && typeof value === 'object' && !(value instanceof Date)) {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([key]) => !COORD_KEY.test(key))
+        .map(([key, entry]) => [key, scrubCoords(entry)]),
+    );
+  }
+  return value;
+}
+
+function messageText(context: WebhookDispatchContext, coords: boolean): string {
+  const text = (context.message ?? context.event).trim();
+  return (coords ? text : stripCoords(text)) || context.event;
+}
+
+function nodeInText(context: WebhookDispatchContext, text: string): boolean {
+  const node = context.nodeName ?? context.nodeId;
+  return Boolean(node && text.startsWith(`${node}:`));
+}
+
+function summarize(context: WebhookDispatchContext, coords: boolean): string {
+  const text = messageText(context, coords);
+  const node = context.nodeName ?? context.nodeId;
+  return [
+    context.severity ? `[${context.severity}]` : null,
+    context.ruleName ?? null,
+    text,
+    context.mac ? `MAC ${context.mac}` : null,
+    node && !nodeInText(context, text) ? `node ${node}` : null,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .slice(0, 2000);
+}
+
+function alertFields(context: WebhookDispatchContext, coords: boolean): Array<[string, string]> {
+  const text = messageText(context, coords);
+  const coordsInText = stripCoords(text) !== text;
+  const fields: Array<[string, string | null]> = [
+    ['Device', context.mac ?? null],
+    ['SSID', context.ssid ?? null],
+    ['RSSI', context.rssi != null ? `${context.rssi} dBm` : null],
+    ['Channel', context.channel != null ? String(context.channel) : null],
+    ['Node', nodeInText(context, text) ? null : (context.nodeName ?? context.nodeId ?? null)],
+    [
+      'Location',
+      coords && !coordsInText && context.lat != null && context.lon != null
+        ? `${context.lat.toFixed(5)}, ${context.lon.toFixed(5)}`
+        : null,
+    ],
+    ['Matched', context.matchedCriteria?.length ? context.matchedCriteria.join(', ') : null],
+    ['Time', context.timestamp.toISOString().replace('T', ' ').slice(0, 19) + ' UTC'],
+  ];
+  return fields.filter((field): field is [string, string] => Boolean(field[1]));
+}
+
+function alertTitle(context: WebhookDispatchContext): string {
+  const nodeLabel = context.eventType === WebhookEventType.NODE_ALERT ? 'Node alert' : null;
+  const parts = [context.severity ?? null, context.ruleName ?? nodeLabel].filter(Boolean);
+  return parts.join(' - ') || 'AntiHunter alert';
+}
+
+function alertBody(context: WebhookDispatchContext, coords: boolean): string {
+  return [
+    messageText(context, coords),
+    ...alertFields(context, coords).map(([name, value]) => `${name}: ${value}`),
+  ].join('\n');
+}
+
+function discordEscape(value: string): string {
+  return value.replace(/[\\*_~`|>[\]()<@]/g, '\\$&');
+}
+
+function slackEscape(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+const DISCORD_COLORS: Record<AlarmLevel, number> = {
+  INFO: 0x5865f2,
+  NOTICE: 0x3ba55d,
+  ALERT: 0xfaa61a,
+  CRITICAL: 0xed4245,
+};
+
 @Injectable()
 export class WebhookDispatcherService {
   private readonly logger = new Logger(WebhookDispatcherService.name);
-  private readonly subscriberCache = new Map<
-    WebhookEventType,
-    { expiresAt: number; webhooks: Webhook[] }
-  >();
+  private subscriberCache: { expiresAt: number; webhooks: Webhook[] } | null = null;
   private readonly subscriberCacheTtlMs = 5_000;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly channels: AlertChannelsService,
+  ) {}
 
-  async dispatchAlert(links: RuleWebhookLink[], context: WebhookDispatchContext): Promise<void> {
-    if (!links?.length) {
-      return;
-    }
-    await Promise.all(
-      links.map((link) =>
-        this.deliver(link.webhook, {
-          ...context,
-          ruleId: link.ruleId,
-          eventType: WebhookEventType.ALERT_TRIGGERED,
-        }),
-      ),
-    );
+  private pushAlert(context: WebhookDispatchContext, source: string): void {
+    void this.channels
+      .alert(
+        alertTitle(context),
+        alertBody(context, true),
+        context.severity,
+        source,
+        alertBody(context, false),
+      )
+      .catch((error) => {
+        this.logger.warn(`Push notify failed: ${error instanceof Error ? error.message : error}`);
+      });
+  }
+
+  async dispatchAlert(context: WebhookDispatchContext): Promise<void> {
+    const source = context.ruleId ? `rule:${context.ruleId}` : 'rule:unknown';
+    context.source = source;
+    this.pushAlert(context, source);
+    await this.dispatchToSubscribers(WebhookEventType.ALERT_TRIGGERED, context);
   }
 
   async dispatchExternalAlert(context: WebhookDispatchContext): Promise<void> {
+    context.source = 'mqtt';
+    this.pushAlert(context, 'mqtt');
     await this.dispatchToSubscribers(WebhookEventType.ALERT_TRIGGERED, context);
   }
 
@@ -94,6 +207,7 @@ export class WebhookDispatcherService {
     const context: WebhookDispatchContext = {
       event: 'inventory.updated',
       eventType: WebhookEventType.INVENTORY_UPDATED,
+      source: 'event:inventory',
       timestamp: new Date(),
       message: `Inventory updated for ${device.mac}`,
       mac: device.mac,
@@ -114,6 +228,7 @@ export class WebhookDispatcherService {
     await this.dispatchToSubscribers(WebhookEventType.NODE_TELEMETRY, {
       event: 'node.telemetry',
       eventType: WebhookEventType.NODE_TELEMETRY,
+      source: 'event:node-telemetry',
       timestamp,
       nodeId: event.nodeId,
       nodeName: event.nodeId,
@@ -138,9 +253,25 @@ export class WebhookDispatcherService {
     } = {},
   ): Promise<void> {
     const timestamp = options.timestamp ?? new Date();
+    this.pushAlert(
+      {
+        event: 'event.target',
+        eventType: WebhookEventType.TARGET_DETECTED,
+        timestamp,
+        nodeId: event.nodeId ?? null,
+        message: `Target detected${event.name ? `: ${event.name}` : ''}`,
+        mac: event.mac,
+        rssi: event.rssi ?? null,
+        channel: event.channel ?? null,
+        lat: event.lat ?? null,
+        lon: event.lon ?? null,
+      },
+      'target',
+    );
     await this.dispatchToSubscribers(WebhookEventType.TARGET_DETECTED, {
       event: 'event.target',
       eventType: WebhookEventType.TARGET_DETECTED,
+      source: 'target',
       timestamp,
       nodeId: event.nodeId ?? null,
       mac: event.mac,
@@ -168,9 +299,34 @@ export class WebhookDispatcherService {
     } = {},
   ): Promise<void> {
     const timestamp = new Date();
+    const data = (event.data ?? {}) as Record<string, unknown>;
+    const text = (value: unknown) => (typeof value === 'string' && value ? value : undefined);
+    const num = (value: unknown) =>
+      typeof value === 'number' && Number.isFinite(value) ? value : null;
+    const source = nodeAlertSource(event.category, event.level, event.data);
+    if (source) {
+      this.pushAlert(
+        {
+          event: 'node.alert',
+          eventType: WebhookEventType.NODE_ALERT,
+          timestamp,
+          nodeId: event.nodeId ?? null,
+          severity: event.level as AlarmLevel,
+          message: options.message ?? event.message,
+          mac: text(data.mac) ?? text(data.src) ?? text(data.bssid),
+          ssid: text(data.ssid) ?? text(data.name) ?? null,
+          rssi: num(data.rssi) ?? (Number.isFinite(Number(data.rssi)) ? Number(data.rssi) : null),
+          channel: num(data.channel),
+          lat: options.lat ?? null,
+          lon: options.lon ?? null,
+        },
+        source,
+      );
+    }
     await this.dispatchToSubscribers(WebhookEventType.NODE_ALERT, {
       event: 'node.alert',
       eventType: WebhookEventType.NODE_ALERT,
+      source: source ?? 'node:status',
       timestamp,
       nodeId: event.nodeId ?? null,
       nodeName: event.nodeId ?? null,
@@ -199,6 +355,7 @@ export class WebhookDispatcherService {
     await this.dispatchToSubscribers(WebhookEventType.DRONE_TELEMETRY, {
       event: 'drone.telemetry',
       eventType: WebhookEventType.DRONE_TELEMETRY,
+      source: 'event:drone-telemetry',
       timestamp,
       nodeId: options.nodeId ?? event.nodeId ?? null,
       siteId: options.siteId ?? null,
@@ -226,6 +383,7 @@ export class WebhookDispatcherService {
     await this.dispatchToSubscribers(WebhookEventType.COMMAND_ACK, {
       event: 'command.ack',
       eventType: WebhookEventType.COMMAND_ACK,
+      source: 'event:command-ack',
       timestamp,
       nodeId: event.nodeId,
       siteId: siteId ?? null,
@@ -246,6 +404,7 @@ export class WebhookDispatcherService {
     await this.dispatchToSubscribers(WebhookEventType.COMMAND_RESULT, {
       event: 'command.result',
       eventType: WebhookEventType.COMMAND_RESULT,
+      source: 'event:command-result',
       timestamp,
       nodeId: event.nodeId,
       siteId: siteId ?? null,
@@ -262,6 +421,7 @@ export class WebhookDispatcherService {
     await this.dispatchToSubscribers(WebhookEventType.SERIAL_RAW, {
       event: 'serial.raw',
       eventType: WebhookEventType.SERIAL_RAW,
+      source: 'event:serial-raw',
       timestamp: new Date(),
       siteId: siteId ?? null,
       message: 'Raw serial line received',
@@ -288,14 +448,34 @@ export class WebhookDispatcherService {
     if (!webhook?.enabled) {
       return;
     }
-    if (
-      webhook.subscribedEvents.length > 0 &&
-      !webhook.subscribedEvents.includes(context.eventType)
-    ) {
-      return;
-    }
+
+    const coords = await this.channels.coordsUnencrypted();
+    const summary = summarize(context, coords);
 
     const payload = {
+      summary,
+      value1: summary,
+      value2: context.severity ?? '',
+      value3: context.mac ?? '',
+      content: discordEscape(summary).slice(0, 2000),
+      allowed_mentions: { parse: [] },
+      text: `*${slackEscape(alertTitle(context))}*\n${slackEscape(alertBody(context, coords))}`.slice(
+        0,
+        3000,
+      ),
+      embeds: [
+        {
+          title: discordEscape(alertTitle(context)).slice(0, 256),
+          description: discordEscape(messageText(context, coords)).slice(0, 4000),
+          color: DISCORD_COLORS[context.severity ?? 'NOTICE'],
+          fields: alertFields(context, coords).map(([name, value]) => ({
+            name,
+            value: discordEscape(value).slice(0, 1024),
+            inline: name !== 'Matched',
+          })),
+          timestamp: context.timestamp.toISOString(),
+        },
+      ],
       event: context.event,
       eventType: context.eventType,
       rule: context.ruleId
@@ -306,7 +486,7 @@ export class WebhookDispatcherService {
           }
         : null,
       data: {
-        message: context.message ?? null,
+        message: context.message ? messageText(context, coords) : null,
         matchedCriteria: context.matchedCriteria ?? [],
         mac: context.mac ?? null,
         nodeId: context.nodeId ?? null,
@@ -314,12 +494,12 @@ export class WebhookDispatcherService {
         ssid: context.ssid ?? null,
         channel: context.channel ?? null,
         rssi: context.rssi ?? null,
-        lat: context.lat ?? null,
-        lon: context.lon ?? null,
+        lat: coords ? (context.lat ?? null) : null,
+        lon: coords ? (context.lon ?? null) : null,
         siteId: context.siteId ?? null,
         timestamp: context.timestamp.toISOString(),
       },
-      payload: context.payload ?? {},
+      payload: coords ? (context.payload ?? {}) : scrubCoords(context.payload ?? {}),
     };
 
     const serialized = JSON.stringify(payload);
@@ -445,27 +625,24 @@ export class WebhookDispatcherService {
     }
 
     const options: ConstructorParameters<typeof Agent>[0] = {
-      keepAliveTimeout: 0,
-      keepAliveMaxTimeout: 0,
       connect: connectOptions as NonNullable<ConstructorParameters<typeof Agent>[0]>['connect'],
     };
 
     return new Agent(options);
   }
 
-  invalidateSubscriberCache(eventType?: WebhookEventType): void {
-    if (eventType) {
-      this.subscriberCache.delete(eventType);
-      return;
-    }
-    this.subscriberCache.clear();
+  invalidateSubscriberCache(): void {
+    this.subscriberCache = null;
   }
 
   private async dispatchToSubscribers(
     eventType: WebhookEventType,
     context: WebhookDispatchContext,
   ): Promise<void> {
-    const subscribers = await this.getSubscribers(eventType);
+    if (context.source && (await this.channels.isSourceMuted(context.source))) {
+      return;
+    }
+    const subscribers = await this.getSubscribers();
     if (subscribers.length === 0) {
       return;
     }
@@ -473,19 +650,13 @@ export class WebhookDispatcherService {
     await Promise.all(subscribers.map((webhook) => this.deliver(webhook, enriched)));
   }
 
-  private async getSubscribers(eventType: WebhookEventType): Promise<Webhook[]> {
-    const cached = this.subscriberCache.get(eventType);
+  private async getSubscribers(): Promise<Webhook[]> {
     const now = Date.now();
-    if (cached && cached.expiresAt > now) {
-      return cached.webhooks;
+    if (this.subscriberCache && this.subscriberCache.expiresAt > now) {
+      return this.subscriberCache.webhooks;
     }
-    const webhooks = await this.prisma.webhook.findMany({
-      where: {
-        enabled: true,
-        subscribedEvents: { has: eventType },
-      },
-    });
-    this.subscriberCache.set(eventType, { webhooks, expiresAt: now + this.subscriberCacheTtlMs });
+    const webhooks = await this.prisma.webhook.findMany({ where: { enabled: true } });
+    this.subscriberCache = { webhooks, expiresAt: now + this.subscriberCacheTtlMs };
     return webhooks;
   }
 }

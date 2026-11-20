@@ -14,6 +14,7 @@ export class CommandsController {
   @Roles(Role.ADMIN, Role.OPERATOR)
   async send(@Req() req: Request, @Body() dto: SendCommandDto) {
     const meta = {
+      role: req.auth?.role ?? null,
       ip: req.ip ?? req.socket.remoteAddress ?? null,
       userAgent: (req.headers['user-agent'] as string | undefined) ?? null,
       fingerprint:

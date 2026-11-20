@@ -9,7 +9,6 @@ export function createWebhook(payload: {
   name: string;
   url: string;
   secret?: string;
-  subscribedEvents?: string[];
   enabled?: boolean;
   shareWithEveryone?: boolean;
   verifyTls?: boolean;
@@ -26,7 +25,6 @@ export function updateWebhook(
     name: string;
     url: string;
     secret?: string;
-    subscribedEvents?: string[];
     enabled?: boolean;
     shareWithEveryone?: boolean;
     verifyTls?: boolean;

@@ -88,11 +88,6 @@ export class CreateAlertRuleDto {
   inventoryMacs?: string[];
 
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  webhookIds?: string[];
-
-  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(-150)

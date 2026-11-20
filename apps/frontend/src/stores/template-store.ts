@@ -34,9 +34,9 @@ export const DEFAULT_TEMPLATES: CommandTemplate[] = [
     id: 'tmpl-device-scan-forever',
     label: 'Device Scan - FOREVER',
     commandName: 'DEVICE_SCAN_START',
-    target: '@NODE_22',
+    target: '@AH01',
     params: ['2', '300', 'FOREVER'],
-    description: 'Keep NODE_22 scanning for WiFi/BLE devices indefinitely.',
+    description: 'Keep AH01 scanning for WiFi/BLE devices indefinitely.',
     builtIn: true,
   },
   {

@@ -435,11 +435,13 @@ export function CommandConsolePage() {
       new Set([
         'CONFIG_NODEID',
         'TRIANGULATE_START',
-        'FACTORY_RESET',
+        'ERASE_REQUEST',
         'ERASE_FORCE',
         'ERASE_CANCEL',
         'AUTOERASE_ENABLE',
         'AUTOERASE_DISABLE',
+        'FACTORY_RESET',
+        'CONFIG_ERASE_PSK',
       ]),
     [],
   );
@@ -895,10 +897,13 @@ export function CommandConsolePage() {
                             onChange={(event) => handleParamInputChange(param, event.target.value)}
                             placeholder={param.placeholder}
                             type={
-                              param.type === 'duration' || param.type === 'number'
-                                ? 'number'
-                                : 'text'
+                              param.secret
+                                ? 'password'
+                                : param.type === 'duration' || param.type === 'number'
+                                  ? 'number'
+                                  : 'text'
                             }
+                            autoComplete={param.secret ? 'off' : undefined}
                             inputMode={
                               param.type === 'duration' || param.type === 'number'
                                 ? 'numeric'

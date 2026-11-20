@@ -14,6 +14,10 @@ export default () => ({
   site: {
     id: process.env.SITE_ID ?? 'default',
   },
+  commands: {
+    allowForever: process.env.ALLOW_FOREVER?.trim().toLowerCase() !== 'false',
+    allowEraseForce: process.env.ALLOW_ERASE_FORCE?.trim().toLowerCase() === 'true',
+  },
   http: {
     port: Number(process.env.PORT ?? 3000),
     prefix: process.env.HTTP_PREFIX ?? 'api',

@@ -34,14 +34,16 @@ import { SerialConfigService } from './serial-config.service';
 import { SERIAL_DELIMITER_CANDIDATES } from './serial.config.defaults';
 import { SerialConnectionOptions, SerialState } from './serial.interfaces';
 import { SerialParseResult, SerialProtocolParser } from './serial.types';
-import { buildCommandPayload } from '../commands/command-builder';
+import { buildCommandPayload, redactCommandParams } from '../commands/command-builder';
 
 const Binding = resolveBinding();
 const dynamicImport = new Function('specifier', 'return import(specifier);') as <TModule>(
   specifier: string,
 ) => Promise<TModule>;
 
-type MeshProtoModule = typeof import('@meshtastic/protobufs');
+type MeshProtoModule = typeof import('@meshtastic/protobufs', {
+  with: { 'resolution-mode': 'import' },
+});
 let meshProtoModulePromise: Promise<MeshProtoModule> | null = null;
 
 function resolveBinding(): AutoDetectTypes {
@@ -1236,7 +1238,10 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     });
     const line = request.line ?? built.line;
 
-    this.logger.debug(`Queueing command line: ${line}`);
+    const sensitive = redactCommandParams(built.name, built.params) !== built.params;
+    this.logger.debug(
+      `Queueing command line: ${sensitive ? `${built.target} ${built.name}:***` : line}`,
+    );
 
     const isStopCommand = built.name === 'STOP';
     if (isStopCommand) {
@@ -2686,7 +2691,7 @@ function sanitizeLine(value: string): string {
   }
 
   // Strip Meshtastic TEXTMSG channel prefix: "0:" or "1 :" (channel 0-7)
-  const chanMatch = /^\s*(\d)\s*:\s*(.+)$/.exec(cleaned);
+  const chanMatch = /^\s*(\d)\s*:\s*([\s\S]+)$/.exec(cleaned);
   if (chanMatch && chanMatch[1].length === 1 && Number(chanMatch[1]) <= 7) {
     cleaned = chanMatch[2].trim();
   }
@@ -2697,7 +2702,7 @@ function sanitizeLine(value: string): string {
   // and the hop adds "relayName: " in front. We detect by checking if the second
   // token is a plain node ID (not a keyword) and the third token IS a keyword.
   const HOP_KEYWORD_RE =
-    /^(?:STATUS|SUMMARY|Target|DEVICE|DRONE|ATTACK|ANOMALY|VIBRATION|VIBRATION_STATUS|VIBRATION_ON_ACK|VIBRATION_OFF_ACK|SETUP_MODE|SETUP_COMPLETE|TAMPER_DETECTED|TAMPER_CANCELLED|ERASE_|AUTOERASE_|BASELINE_STATUS|BASELINE_ACK|BATTERY_SAVER_STATUS|BATTERY_SAVER_START_ACK|BATTERY_SAVER_STOP_ACK|HEARTBEAT|STARTUP|GPS|TRIANGULATE|TARGET_DATA|T_D:|T_C:|T_F:|IDENTITY|RANDOMIZATION|RANDOMIZATION_DONE|SCAN_DONE|DEAUTH_DONE|DRONE_DONE|BASELINE_DONE|LIST_SCAN_DONE|PROBE_DONE|PROBE_HIT|PROBE_ACK|PCAP_|SCAN_ACK|DEVICE_SCAN_ACK|DRONE_ACK|DEAUTH_ACK|CONFIG_ACK|STOP_ACK|REBOOT_ACK|HB_ACK|TRI_START|WIPE_TOKEN|ERASE_TOKEN|RTC_SYNC|TIME_SYNC|CODES:|EVILTWIN|OWE_ABUSE|PMKID_|EAPOL_BAIT|HSHK|KARMA_|PWNAGOTCHI|PROBE_FLOOD|SAE_DOS|DEAUTH_FLOOD|DEAUTH_FORGE|DEAUTH_AP_TARGETED|BEACON_|ASSOC_SLEEP|AUTH_FLOOD|SSID_CONFUSION|FRAG|ATTACKER_HUNT|RECON|JAMMING|SENTINEL|GROUP_ACK|DETECT_CFG|INCIDENTS|DEDUP_CLEAR_ACK|FACTORY_RESET|MESH_SPOOF_SELF|MESH_FLOOD|MESH_CMD_INJECT|DEVICE_DISAPPEARED|RID_|TOF_|BLOOM|IDHASH|CHAN_ASSIGN|CSI_|CAMPAIGN_|SCHED_|BASELINE_WATCH|BASELINE_RESET|PROBE_DB_CLEAR|CALIBRATE_|BATTERY_SAVER|RADIO_DETECTED|RADIO_KNOWN_|CSA_SPOOF|QUIET_ABUSE|VIBSCAN_|ATTACKER_TRILAT|DETECT_|QUORUM_|HUNT_COOLDOWN|MESH_TX_CANCEL|SD_REPAIR|TRI_ACK|Time:)/i;
+    /^(?:STATUS|Target|DEVICE|DRONE|ATTACK|ANOMALY|VIBRATION|VIBRATION_STATUS|VIBRATION_ON_ACK|VIBRATION_OFF_ACK|SETUP_MODE|SETUP_COMPLETE|TAMPER_DETECTED|TAMPER_CANCELLED|ERASE_|AUTOERASE_|BASELINE_STATUS|BASELINE_ACK|BATTERY_SAVER_STATUS|BATTERY_SAVER_START_ACK|BATTERY_SAVER_STOP_ACK|HEARTBEAT|STARTUP|GPS|TRIANGULATE|TARGET_DATA|T_D:|T_C:|T_F:|IDENTITY|RANDOMIZATION|RANDOMIZATION_DONE|SCAN_DONE|DEAUTH_DONE|DRONE_DONE|BASELINE_DONE|LIST_SCAN_DONE|PROBE_DONE|PROBE_HIT|PROBE_ACK|PCAP_|SCAN_ACK|DEVICE_SCAN_ACK|DRONE_ACK|DEAUTH_ACK|CONFIG_ACK|STOP_ACK|REBOOT_ACK|HB_ACK|TRI_START|WIPE_TOKEN|ERASE_TOKEN|RTC_SYNC|TIME_SYNC|CODES:|EVILTWIN|OWE_ABUSE|PMKID_|EAPOL_BAIT|HSHK|KARMA_|PWNAGOTCHI|PROBE_FLOOD|SAE_DOS|DEAUTH_FLOOD|DEAUTH_FORGE|DEAUTH_AP_TARGETED|BEACON_|ASSOC_SLEEP|AUTH_FLOOD|SSID_CONFUSION|FRAG|ATTACKER_HUNT|RECON|JAMMING|SENTINEL|GROUP_ACK|DETECT_CFG|INCIDENTS|DEDUP_CLEAR_ACK|FACTORY_RESET|MESH_SPOOF_SELF|MESH_FLOOD|MESH_CMD_INJECT|DEVICE_DISAPPEARED|RID_|TOF_|BLOOM|IDHASH|CHAN_ASSIGN|CSI_|SUMMARY|CAMPAIGN_|SCHED_|CALIBRATE_|SELF_RADIO_|RADIO_KNOWN_|RADIO_DETECTED|CSA_SPOOF|QUIET_ABUSE|FLEET_|VIBSCAN_|ATTACKER_TRILAT|MESH_TX_CANCEL|DEVICE_DB_CLEAR|PROBE_DB_CLEAR|BASELINE_RESET|BASELINE_WATCH|RANDOMIZATION_RESET|DETECT_CLEAR|DETECT_COUNTS|SD_REPAIR|BATTERY_SAVER|DETECT_|QUORUM_|HUNT_COOLDOWN|TRI_ACK|Time:)/i;
   const hopMatch = /^([A-Za-z0-9_-]{1,6}):\s+([A-Za-z0-9_.:-]+:\s+)(.+)$/i.exec(cleaned);
   if (hopMatch) {
     const secondToken = hopMatch[2].replace(/[:\s]+$/, '');

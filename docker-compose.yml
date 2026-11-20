@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: command_center
       POSTGRES_PASSWORD: command_center
     ports:
-      - '5432:5432'
+      - '127.0.0.1:5432:5432'
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -31,6 +31,7 @@ services:
         aliases:
           - backend
           - cc_backend
+      signal: {}
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -43,14 +44,34 @@ services:
       ALLOW_FOREVER: 'true'
       ALLOW_ERASE_FORCE: 'false'
       TRUST_PROXY: '1'
+      LISTEN_HOST: '0.0.0.0'
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      TS_ALLOWED_LOGINS: ${TS_ALLOWED_LOGINS:-}
+      NTFY_URL: ${NTFY_URL:-}
+      NTFY_TOKEN: ${NTFY_TOKEN:-}
+      SIGNAL_API_URL: ${SIGNAL_API_URL:-http://signal-proxy:8080}
+      SIGNAL_PROXY_TOKEN: ${SIGNAL_PROXY_TOKEN:-}
+      SIGNAL_NUMBER: ${SIGNAL_NUMBER:-}
+      SIGNAL_RECIPIENTS: ${SIGNAL_RECIPIENTS:-}
+      MATRIX_HOMESERVER_URL: ${MATRIX_HOMESERVER_URL:-}
+      MATRIX_ACCESS_TOKEN: ${MATRIX_ACCESS_TOKEN:-}
+      MATRIX_ROOM_ID: ${MATRIX_ROOM_ID:-}
+      AHCC_MATTER_ENABLED: ${AHCC_MATTER_ENABLED:-false}
+      AHCC_MATTER_PASSCODE: ${AHCC_MATTER_PASSCODE:-}
+      AHCC_MATTER_STORAGE: /app/data/matter
+      AHCC_MATTER_INTERFACE: ${AHCC_MATTER_INTERFACE:-}
+      REMOTE_ALERTS_SECRET_KEY: ${REMOTE_ALERTS_SECRET_KEY:-}
+      AHCC_TS_UPSTREAM: ${AHCC_TS_UPSTREAM:-http://cc_frontend:80}
       AHCC_TILE_CACHE: /app/data/tiles
       AHCC_TILE_CACHE_MAX_MB: ${AHCC_TILE_CACHE_MAX_MB:-2048}
-      AHCC_DB_MISMATCH: ${AHCC_DB_MISMATCH:-abort}
     ports:
-      - '3000:3000'
+      - '127.0.0.1:3000:3000'
     volumes:
       - ./.git:/app/.git:ro
-      - backend-secrets:/app/apps/backend/.secrets
+      - matter-state:/app/data/matter
+      - remote-secrets:/app/apps/backend/.secrets
       - tile-cache:/app/data/tiles
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/healthz').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
@@ -69,7 +90,7 @@ services:
     container_name: cc_frontend
     restart: unless-stopped
     ports:
-      - '8080:80'
+      - '127.0.0.1:8080:80'
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:80/ || exit 1"]
       interval: 10s
@@ -80,7 +101,65 @@ services:
       backend:
         condition: service_healthy
 
+  tailscale:
+    image: tailscale/tailscale:v1.104.7@sha256:72c1e19e0aedca96b8533bbb0b4368564410ff20b17e53b804eb6c1f04a31be4
+    container_name: cc_tailscale
+    profiles: ['remote']
+    network_mode: service:frontend
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_HOSTNAME: ${TS_HOSTNAME:-ahcc}
+      TS_EXTRA_ARGS: --advertise-tags=tag:ahcc
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: 'true'
+      TS_SERVE_CONFIG: /config/serve.json
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - ./docker/tailscale:/config:ro
+    depends_on:
+      frontend:
+        condition: service_healthy
+
+  signal-api:
+    image: bbernhard/signal-cli-rest-api:0.100@sha256:2399d449123cdad56c4d859277e3b9127e1a00c4d2ab4601c239882609286cf8
+    container_name: cc_signal
+    profiles: ['signal']
+    restart: unless-stopped
+    environment:
+      MODE: native
+      AUTO_RECEIVE_SCHEDULE: '0 */6 * * *'
+    networks:
+      - signal-internal
+    volumes:
+      - signal-state:/home/.local/share/signal-cli
+
+  signal-proxy:
+    image: node:24.22.3-bookworm-slim
+    container_name: cc_signal_proxy
+    profiles: ['signal']
+    restart: unless-stopped
+    command: ['node', '/app/proxy.mjs']
+    environment:
+      SIGNAL_UPSTREAM: http://signal-api:8080
+      SIGNAL_PROXY_TOKEN: ${SIGNAL_PROXY_TOKEN:-}
+      PORT: '8080'
+    volumes:
+      - ./docker/signal-proxy/proxy.mjs:/app/proxy.mjs:ro
+    networks:
+      - signal
+      - signal-internal
+    depends_on:
+      - signal-api
+
+networks:
+  signal: {}
+  signal-internal: {}
+
 volumes:
   postgres-data:
-  backend-secrets:
+  tailscale-state:
+  matter-state:
+  signal-state:
+  remote-secrets:
   tile-cache:

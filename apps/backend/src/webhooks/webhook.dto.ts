@@ -1,5 +1,3 @@
-import type { WebhookEventType } from '@prisma/client';
-
 export interface WebhookOwnerDto {
   id: string;
   email: string;
@@ -22,7 +20,6 @@ export interface WebhookDto {
   url: string;
   enabled: boolean;
   verifyTls: boolean;
-  subscribedEvents: WebhookEventType[];
   shared: boolean;
   clientCertificate?: string | null;
   clientKey?: string | null;
@@ -30,6 +27,5 @@ export interface WebhookDto {
   lastSuccessAt?: Date | null;
   lastFailureAt?: Date | null;
   owner?: WebhookOwnerDto | null;
-  linkedRuleIds: string[];
   recentDeliveries: WebhookDeliveryDto[];
 }

@@ -16,7 +16,7 @@ import type { Request } from 'express';
 import { CreateWebhookDto } from './dto/create-webhook.dto';
 import { UpdateWebhookDto } from './dto/update-webhook.dto';
 import { WebhooksService } from './webhooks.service';
-import { TwoFactorRequiredGuard } from '../auth/two-factor-required.guard';
+import { TwoFactorRequiredGuard } from '../push/two-factor-required.guard';
 
 interface RequestAuth {
   userId: string;

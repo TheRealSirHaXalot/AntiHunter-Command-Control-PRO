@@ -1919,6 +1919,27 @@ print_diagnostic_info() {
     echo ""
 }
 
+setup_signal_host() {
+    if [[ "$(uname -s)" != "Linux" ]] || ! command -v systemctl >/dev/null 2>&1; then
+        info "Signal alerts: this host uses the Docker connector (Config > Remote alerts shows the command)"
+        return
+    fi
+    echo ""
+    if ! prompt_yes_no "Install Signal alerts (signal-cli as isolated ahcc-signal service, encrypted state; needs sudo)?"; then
+        return
+    fi
+    step "Installing the isolated Signal connector..."
+    if ! sudo bash "$REPO_DIR/scripts/signal/install-signal-host.sh" --backend-user "$(whoami)"; then
+        warn "Signal connector install failed; alerts will use other channels"
+        return
+    fi
+    local env_file="$REPO_DIR/apps/backend/.env"
+    if ! grep -q '^AHCC_SIGNAL_GATE=' "$env_file" 2>/dev/null; then
+        echo "AHCC_SIGNAL_GATE=/run/ahcc-signal-gate.sock" >> "$env_file"
+    fi
+    success "Signal connector installed; link it from Config > Remote alerts"
+}
+
 main() {
     echo -e "${BLUE}"
     cat <<'EOF'
@@ -1952,6 +1973,7 @@ EOF
     setup_postgresql
     install_dependencies
     create_backend_env
+    setup_signal_host
     setup_database
     
     print_summary

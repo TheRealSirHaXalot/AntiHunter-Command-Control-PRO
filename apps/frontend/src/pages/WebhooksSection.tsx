@@ -1,7 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { MdAdd, MdDelete, MdLink, MdRefresh } from 'react-icons/md';
 
+import {
+  currentPushSubscription,
+  disablePush,
+  enablePush,
+  pushSupported,
+  sendTestPush,
+} from '../api/push';
 import type { Webhook } from '../api/types';
 import {
   createWebhook,
@@ -14,33 +21,14 @@ import { useAuthStore } from '../stores/auth-store';
 
 type WebhookFormMode = 'create' | 'edit';
 
-const WEBHOOK_EVENT_OPTIONS = [
-  { value: 'ALERT_TRIGGERED', label: 'Alert triggered' },
-  { value: 'INVENTORY_UPDATED', label: 'Inventory updated' },
-  { value: 'NODE_TELEMETRY', label: 'Node telemetry' },
-  { value: 'TARGET_DETECTED', label: 'Target detected' },
-  { value: 'NODE_ALERT', label: 'Node alerts & status' },
-  { value: 'HEARTBEAT', label: 'Node heartbeat' },
-  { value: 'TRIANGULATION', label: 'Triangulation events' },
-  { value: 'TIME_SYNC', label: 'Time sync events' },
-  { value: 'DRONE_TELEMETRY', label: 'Drone telemetry' },
-  { value: 'COMMAND_ACK', label: 'Command acknowledgements' },
-  { value: 'COMMAND_RESULT', label: 'Command results' },
-  { value: 'SERIAL_RAW', label: 'Raw serial lines' },
-] as const;
-const WEBHOOK_EVENT_LABELS = WEBHOOK_EVENT_OPTIONS.reduce<Record<string, string>>((acc, option) => {
-  acc[option.value] = option.label;
-  return acc;
-}, {});
-
 interface WebhookFormState {
   id?: string;
+  presetKey: string;
   name: string;
   url: string;
   secret: string;
   enabled: boolean;
   shareWithEveryone: boolean;
-  subscribedEvents: string[];
   verifyTls: boolean;
   clientCertificate: string;
   clientKey: string;
@@ -48,17 +36,156 @@ interface WebhookFormState {
 }
 
 const DEFAULT_FORM_STATE: WebhookFormState = {
+  presetKey: '',
   name: '',
   url: '',
   secret: '',
   enabled: true,
   shareWithEveryone: false,
-  subscribedEvents: ['ALERT_TRIGGERED'],
   verifyTls: true,
   clientCertificate: '',
   clientKey: '',
   caBundle: '',
 };
+
+const WEBHOOK_PRESETS = [
+  {
+    key: 'discord',
+    label: 'Discord',
+    url: 'https://discord.com/api/webhooks/<id>/<token>',
+    hint: 'Discord: Server Settings > Integrations > Webhooks > Copy Webhook URL. Posts the alert summary as the message.',
+  },
+  {
+    key: 'slack',
+    label: 'Slack',
+    url: 'https://hooks.slack.com/services/<path>',
+    hint: 'Slack: create an Incoming Webhook for a channel and paste its URL.',
+  },
+  {
+    key: 'ifttt',
+    label: 'IFTTT',
+    url: 'https://maker.ifttt.com/trigger/<event>/json/with/key/<key>',
+    hint: 'IFTTT: Webhooks service > "Receive a web request". Replace <event> and <key>. In the applet, Value1 is the alert text, Value2 the severity, Value3 the MAC.',
+  },
+  {
+    key: 'home-assistant',
+    label: 'Home Assistant / Apple Home',
+    url: 'https://<home-assistant-host>/api/webhook/<webhook_id>',
+    hint: 'Home Assistant: automation with a Webhook trigger; use trigger.json.summary, trigger.json.rule.severity, trigger.json.data.mac. Apple Home: expose the resulting HA entity through the HomeKit Bridge integration.',
+  },
+] as const;
+
+export function PushNotificationsCard() {
+  const [subscribed, setSubscribed] = useState<boolean | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const supported = pushSupported();
+
+  useEffect(() => {
+    if (!supported) {
+      return;
+    }
+    void currentPushSubscription()
+      .then(async (sub) => {
+        if (sub && Notification.permission === 'granted') {
+          await enablePush();
+        }
+      })
+      .catch((error: unknown) => setStatus(error instanceof Error ? error.message : String(error)))
+      .finally(() => {
+        void currentPushSubscription().then((sub) => setSubscribed(Boolean(sub)));
+      });
+  }, [supported]);
+
+  const run = async (action: () => Promise<unknown>, done: string) => {
+    setBusy(true);
+    setStatus(null);
+    try {
+      await action();
+      setSubscribed(Boolean(await currentPushSubscription()));
+      setStatus(done);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleTest = async () => {
+    setBusy(true);
+    setStatus(null);
+    try {
+      const result = await sendTestPush();
+      if (!result.configured) {
+        setStatus('Push is not configured on the server.');
+      } else if (result.failed > 0) {
+        const first = result.failures[0];
+        setStatus(
+          `Push service rejected it (${first?.status ?? 'error'}): ${first?.message ?? 'unknown'}.`,
+        );
+      } else if (result.sent === 0) {
+        setStatus('No subscribed device for your account. Enable it here first.');
+      } else {
+        setStatus(
+          `Accepted for ${result.sent} device(s). If nothing appears, the block is in macOS notification settings or Focus.`,
+        );
+      }
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="remote-subsection">
+      <div className="channel-row__head">
+        <h3>Alerts on this device</h3>
+        <span className={subscribed ? 'badge badge--active' : 'badge'}>
+          {subscribed ? 'On' : supported ? 'Off' : 'Unavailable'}
+        </span>
+      </div>
+      <p className="field-hint">Encrypted push alerts to this browser, even when it is closed.</p>
+      <div>
+        {!supported ? (
+          <p className="empty-state">
+            Device push is not available here. It needs a secure page (HTTPS or localhost) and a
+            browser that supports web push. If you opened AHCC by http:// IP, switch to HTTPS or
+            MagicDNS and this button appears.
+          </p>
+        ) : (
+          <div className="controls-row">
+            {subscribed ? (
+              <>
+                <button type="button" className="control-chip" disabled={busy} onClick={handleTest}>
+                  Send test
+                </button>
+                <button
+                  type="button"
+                  className="control-chip control-chip--ghost"
+                  disabled={busy}
+                  onClick={() => run(disablePush, 'Disabled on this device.')}
+                >
+                  Disable
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="control-chip"
+                disabled={busy || subscribed === null}
+                onClick={() => run(enablePush, 'Enabled on this device.')}
+              >
+                Enable on this device
+              </button>
+            )}
+          </div>
+        )}
+        {status && <p className="config-hint">{status}</p>}
+      </div>
+    </section>
+  );
+}
 
 export function WebhooksSection() {
   const queryClient = useQueryClient();
@@ -111,14 +238,12 @@ export function WebhooksSection() {
     setFormMode('edit');
     setFormState({
       id: webhook.id,
+      presetKey: '',
       name: webhook.name,
       url: webhook.url,
       secret: '',
       enabled: webhook.enabled,
       shareWithEveryone: webhook.shared,
-      subscribedEvents: webhook.subscribedEvents.length
-        ? webhook.subscribedEvents
-        : ['ALERT_TRIGGERED'],
       verifyTls: webhook.verifyTls ?? true,
       clientCertificate: webhook.clientCertificate ?? '',
       clientKey: webhook.clientKey ?? '',
@@ -135,7 +260,6 @@ export function WebhooksSection() {
         secret: formState.secret || undefined,
         enabled: formState.enabled,
         shareWithEveryone: formState.shareWithEveryone,
-        subscribedEvents: formState.subscribedEvents,
         verifyTls: formState.verifyTls,
         clientCertificate: formState.clientCertificate,
         clientKey: formState.clientKey,
@@ -150,7 +274,6 @@ export function WebhooksSection() {
           secret: formState.secret || undefined,
           enabled: formState.enabled,
           shareWithEveryone: formState.shareWithEveryone,
-          subscribedEvents: formState.subscribedEvents,
           verifyTls: formState.verifyTls,
           clientCertificate: formState.clientCertificate,
           clientKey: formState.clientKey,
@@ -165,26 +288,6 @@ export function WebhooksSection() {
     setFormState({ ...DEFAULT_FORM_STATE });
   };
 
-  const formatEvents = (events: string[]) =>
-    events.length === 0
-      ? 'None selected'
-      : events.map((value) => WEBHOOK_EVENT_LABELS[value] ?? value).join(', ');
-
-  const handleToggleEvent = (eventValue: string) => {
-    setFormState((prev) => {
-      if (prev.subscribedEvents.includes(eventValue)) {
-        return {
-          ...prev,
-          subscribedEvents:
-            prev.subscribedEvents.length === 1
-              ? prev.subscribedEvents
-              : prev.subscribedEvents.filter((value) => value !== eventValue),
-        };
-      }
-      return { ...prev, subscribedEvents: [...prev.subscribedEvents, eventValue] };
-    });
-  };
-
   const handleDelete = () => {
     if (formState.id) {
       deleteMutation.mutate(formState.id);
@@ -194,6 +297,22 @@ export function WebhooksSection() {
   const handleTest = (id: string) => {
     testMutation.mutate(id);
   };
+
+  const applyPreset = (key: string) => {
+    const preset = WEBHOOK_PRESETS.find((item) => item.key === key);
+    setFormState((prev) =>
+      preset
+        ? {
+            ...prev,
+            presetKey: key,
+            name: preset.label,
+            url: preset.url,
+          }
+        : { ...prev, presetKey: '', url: '' },
+    );
+  };
+
+  const activePreset = WEBHOOK_PRESETS.find((item) => item.key === formState.presetKey);
 
   return (
     <div className="config-grid webhooks-stack">
@@ -219,8 +338,6 @@ export function WebhooksSection() {
                     <th>Name</th>
                     <th>URL</th>
                     <th>Status</th>
-                    <th>Events</th>
-                    <th>Linked rules</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -230,10 +347,6 @@ export function WebhooksSection() {
                       <td>{webhook.name}</td>
                       <td>{webhook.url}</td>
                       <td>{webhook.enabled ? 'Enabled' : 'Disabled'}</td>
-                      <td className="webhook-events-cell">
-                        {formatEvents(webhook.subscribedEvents)}
-                      </td>
-                      <td>{webhook.linkedRuleIds.length}</td>
                       <td className="table-actions">
                         <button
                           type="button"
@@ -258,7 +371,7 @@ export function WebhooksSection() {
             </div>
           ) : (
             <p className="empty-state">
-              No webhooks configured yet. Use the form on the right to create one.
+              No webhooks configured yet. Use the form below to create one.
             </p>
           )}
         </div>
@@ -270,6 +383,30 @@ export function WebhooksSection() {
           <p>Define HTTPS callback URLs to notify when alerts trigger.</p>
         </header>
         <form className="config-card__body" onSubmit={handleSubmit}>
+          {formMode === 'create' && (
+            <label className="form-field">
+              <span>Preset</span>
+              <select
+                className="control-input"
+                value={formState.presetKey}
+                onChange={(event) => applyPreset(event.target.value)}
+              >
+                <option value="">Custom URL</option>
+                {WEBHOOK_PRESETS.map((preset) => (
+                  <option key={preset.key} value={preset.key}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {activePreset && <p className="config-hint">{activePreset.hint}</p>}
+          {activePreset && activePreset.key !== 'home-assistant' && (
+            <p className="config-hint">
+              {activePreset.label} can read every alert sent to it. For end-to-end encrypted alerts
+              use push notifications or Signal.
+            </p>
+          )}
           <div className="form-grid">
             <label>
               <span>Name</span>
@@ -331,8 +468,8 @@ export function WebhooksSection() {
               </label>
             )}
           </div>
-          <div className="webhook-security">
-            <h4>HTTPS security</h4>
+          <details className="webhook-security webhook-advanced">
+            <summary>Advanced (TLS &amp; client certificates)</summary>
             <label className="control-checkbox">
               <input
                 type="checkbox"
@@ -390,22 +527,7 @@ export function WebhooksSection() {
             <p className="config-hint">
               Leave certificate fields empty to use the system trust store without mutual TLS.
             </p>
-          </div>
-          <div className="webhook-event-picker">
-            <span>Deliver these events</span>
-            <div className="webhook-event-picker__list">
-              {WEBHOOK_EVENT_OPTIONS.map((option) => (
-                <label key={option.value} className="control-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={formState.subscribedEvents.includes(option.value)}
-                    onChange={() => handleToggleEvent(option.value)}
-                  />
-                  {option.label}
-                </label>
-              ))}
-            </div>
-          </div>
+          </details>
           <div className="controls-row">
             <button
               type="submit"

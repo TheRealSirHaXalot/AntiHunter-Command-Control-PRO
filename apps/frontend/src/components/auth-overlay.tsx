@@ -42,8 +42,8 @@ export function AuthOverlay() {
   const logout = useAuthStore((state) => state.logout);
   const clearPostLoginNotice = useAuthStore((state) => state.clearPostLoginNotice);
 
-  const [email, setEmail] = useState('admin@example.com');
-  const [password, setPassword] = useState('admin');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [ackChecked, setAckChecked] = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);

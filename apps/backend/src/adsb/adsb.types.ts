@@ -84,7 +84,6 @@ export interface AdsbAlertRule {
   mapColor?: string | null;
   mapLabel?: string | null;
   blink?: boolean;
-  webhookIds?: string[] | null;
   messageTemplate?: string | null;
   createdAt: string;
   updatedAt: string;
