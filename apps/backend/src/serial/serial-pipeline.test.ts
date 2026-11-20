@@ -1391,6 +1391,28 @@ expectDevices(
   [PACKET_WANT[0], dev('AA:BB:CC:DD:EE:02', -71, 'WiFi')],
 );
 
+parser.reset();
+for (const [input, ackType, status] of [
+  ['AH01: CONFIG_ACK:BLE_LONGRANGE:1', 'BLE_LONGRANGE_ACK', 'OK'],
+  ['AH01: CONFIG_ACK:BLE_CLASSIFY:0', 'BLE_CLASSIFY_ACK', 'OK'],
+  ['AH01: CONFIG_ACK:SESSION_DEDUP:1', 'SESSION_DEDUP_ACK', 'OK'],
+  ['AH01: CONFIG_ACK:DEDUP_TTL:INVALID', 'DEDUP_TTL_ACK', 'ERROR'],
+  ['AH01: CONFIG_ACK:NODE_ID:INVALID_LENGTH', 'NODE_ID_ACK', 'ERROR'],
+  ['AH01: CONFIG_ACK:CHANNELS:1..11', 'CHANNELS_ACK', 'OK'],
+  ['AH01: CONFIG_ACK:ERASE_PSK:DENIED', 'ERASE_PSK_ACK', 'ERROR'],
+  ['AH01: CONFIG_ACK:OK', 'CONFIG_ACK', 'OK'],
+]) {
+  const ack = parser.parseLine(input).find((r) => r.kind === 'command-ack') as
+    | { ackType?: string; status?: string }
+    | undefined;
+  if (ack?.ackType === ackType && ack?.status === status) {
+    passed++;
+  } else {
+    failed++;
+    failures.push(`FAIL [${input}]: got ${ack?.ackType}/${ack?.status}, want ${ackType}/${status}`);
+  }
+}
+
 console.log(`\n  ${passed} passed, ${failed} failed\n`);
 
 if (failures.length > 0) {

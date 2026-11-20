@@ -100,6 +100,7 @@ const COMMAND_HANDLERS = new Map<string, CommandHandler>([
   ['MESH_TX_CANCEL', expectNoParams],
   ['BASELINE_WATCH', expectNoParams],
   ['BLE_CLASSIFY', handleBleClassify],
+  ['BLE_LONGRANGE', handleBleLongRange],
   ['CAMPAIGN_START', handleCampaignStart],
   ['CAMPAIGN_STOP', expectNoParams],
   ['CAMPAIGN_STATUS', expectNoParams],
@@ -890,6 +891,13 @@ function handleCsiCfg(params: string[]): string[] {
 function handleBleClassify(params: string[]): string[] {
   if (params.length !== 1 || (params[0] !== '0' && params[0] !== '1')) {
     throw new BadRequestException('BLE_CLASSIFY expects 0 or 1.');
+  }
+  return [params[0]];
+}
+
+function handleBleLongRange(params: string[]): string[] {
+  if (params.length !== 1 || (params[0] !== '0' && params[0] !== '1')) {
+    throw new BadRequestException('BLE_LONGRANGE expects 0 or 1.');
   }
   return [params[0]];
 }

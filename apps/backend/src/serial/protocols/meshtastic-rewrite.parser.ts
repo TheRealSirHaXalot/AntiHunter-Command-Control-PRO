@@ -71,6 +71,7 @@ const BATTERY_SAVER_STATUS_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*BATTERY_SAVER_STATUS:\s*Enabled:(?<enabled>YES|NO)(?:\s+Interval:(?<interval>\d+)min)?(?:\s+NextHB:(?<nextHb>\d+)s)?(?:\s+Temp:(?<tempC>-?\d+(?:\.\d+)?)[cC])?(?:\s+GPS:(?<lat>-?\d+(?:\.\d+)?),(?<lon>-?\d+(?:\.\d+)?))?/i;
 
 const HEARTBEAT_REGEX = /^(?<id>[A-Za-z0-9_.:-]+):\s*HEARTBEAT:\s*(?<msg>.+)$/i;
+const CONFIG_SUB_ACK_REGEX = /^[A-Za-z0-9_.:-]+?:\s*CONFIG_ACK:(?<name>[A-Z_]+):(?<detail>.*)$/i;
 const ACK_REGEX =
   /^(?<id>[A-Za-z0-9_.:-]+):\s*(?<kind>(?:SCAN|DEVICE_SCAN|DRONE|DEAUTH|RANDOMIZATION|BASELINE|CONFIG|TRIANGULATE(?:_STOP)?|TRI_START|STOP|REBOOT|BATTERY_SAVER(?:_START|_STOP)?|VIBRATION_(?:ON|OFF)|PROBE|PCAP(?:_STOP|_LIMITS)?|HB)_ACK):?(?<status>[A-Z_=0-9]*)/i;
 
@@ -1691,6 +1692,19 @@ export class MeshtasticRewriteParser implements SerialProtocolParser {
     }
     const ack = ACK_REGEX.exec(payload);
     if (ack?.groups) {
+      const configSub = CONFIG_SUB_ACK_REGEX.exec(payload);
+      if (configSub?.groups) {
+        const detail = configSub.groups.detail.trim();
+        return [
+          {
+            kind: 'command-ack',
+            nodeId: nodeId ?? ack.groups.id,
+            ackType: `${configSub.groups.name.toUpperCase()}_ACK`,
+            status: /^(INVALID|DENIED|FAILED)/i.test(detail) ? 'ERROR' : 'OK',
+            raw,
+          },
+        ];
+      }
       return [
         {
           kind: 'command-ack',

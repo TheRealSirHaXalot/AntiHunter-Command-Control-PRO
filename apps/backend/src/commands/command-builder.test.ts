@@ -225,6 +225,21 @@ check('CONFIG_BAND rejects a missing mode', () => {
   assert.throws(() => buildCommandPayload({ target: '@AHC5', name: 'CONFIG_BAND', params: [] }));
 });
 
+check('BLE_LONGRANGE sends 0 or 1 and rejects anything else', () => {
+  assert.equal(
+    buildCommandPayload({ target: '@ALL', name: 'BLE_LONGRANGE', params: ['1'] }).line,
+    '@ALL BLE_LONGRANGE:1',
+  );
+  assert.equal(
+    buildCommandPayload({ target: '@AH01', name: 'BLE_LONGRANGE', params: ['0'] }).line,
+    '@AH01 BLE_LONGRANGE:0',
+  );
+  assert.throws(() =>
+    buildCommandPayload({ target: '@ALL', name: 'BLE_LONGRANGE', params: ['2'] }),
+  );
+  assert.throws(() => buildCommandPayload({ target: '@ALL', name: 'BLE_LONGRANGE', params: [] }));
+});
+
 if (failed) {
   console.log(`${failed} failed`);
   process.exit(1);

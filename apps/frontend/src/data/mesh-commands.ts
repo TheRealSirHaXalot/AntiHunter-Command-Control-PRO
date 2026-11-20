@@ -1310,6 +1310,26 @@ export const MESH_COMMANDS: CommandDefinition[] = [
     examples: [{ target: '@ALL', params: ['0'] }],
   },
   {
+    name: 'BLE_LONGRANGE',
+    group: 'Configuration',
+    description:
+      'Also listen for Bluetooth 5 long range. Ordinary BLE gets less listening time. Off by default.',
+    defaultTarget: '@ALL',
+    parameters: [
+      {
+        key: 'enabled',
+        label: 'BLE Long Range',
+        type: 'select',
+        required: true,
+        options: [
+          { label: 'Enabled', value: '1' },
+          { label: 'Disabled', value: '0' },
+        ],
+      },
+    ],
+    examples: [{ target: '@ALL', params: ['0'] }],
+  },
+  {
     name: 'BASELINE_WATCH',
     group: 'Detection',
     description: 'Mark the running baseline to start watching for anomalies.',
